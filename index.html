@@ -48,7 +48,7 @@
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
     <div id="game-container" class="w-full max-w-lg mx-auto">
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-2">ロセツと世界の綻び-シュミレーション世界</h1>
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-2">ロセツと世界の綻び</h1>
         <p class="text-sm text-center text-gray-600 mb-4">PC: [矢印キー]で移動, [スペース]で会話/直す</p>
         <canvas id="gameCanvas"></canvas>
     </div>
@@ -108,7 +108,7 @@
             row.forEach((tile, x) => {
                 const pos = { x: x * TILE_SIZE, y: y * TILE_SIZE };
                 if (tile === 5) { // Komaru
-                    npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセちゃん。この世界の綻びは、タフガイならすぐに見つけられるはず！" });
+                    npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセツか。この世界の綻びは、タフガイならすぐに見つけちまうぜ！" });
                 } else if (tile === 6) { // Tetsuji
                     npcs.push({ ...pos, id: 'tetsuji', type: 6, dialogue: "うぅ…首輪についてた大事な野球ボールが、変な光と共になくなっちゃったんだ…" });
                 } else if (tile === 7 || tile === 8) { // Glitches
@@ -175,55 +175,132 @@
         }
 
         function drawKomaru(npc) {
-             // Simplified Komaru
             ctx.save();
             ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
+            const p = { size: TILE_SIZE * 0.9 };
+            // Body
             ctx.fillStyle = 'white';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 2;
-            // Body & Head
             ctx.beginPath();
-            ctx.ellipse(0, TILE_SIZE*0.1, TILE_SIZE*0.28, TILE_SIZE*0.4, 0, 0, Math.PI * 2);
-            ctx.ellipse(0, -TILE_SIZE*0.2, TILE_SIZE*0.35, TILE_SIZE*0.25, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, p.size * 0.15, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2); // Body
             ctx.fill();
             ctx.stroke();
-            // Eyebrows (his defining feature)
+            // Head
             ctx.beginPath();
-            ctx.moveTo(-TILE_SIZE*0.2, -TILE_SIZE*0.35);
-            ctx.lineTo(-TILE_SIZE*0.05, -TILE_SIZE*0.3);
-            ctx.moveTo(TILE_SIZE*0.2, -TILE_SIZE*0.35);
-            ctx.lineTo(TILE_SIZE*0.05, -TILE_SIZE*0.3);
+            ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2); // Head
+            ctx.fill();
+            ctx.stroke();
+            // Ears
+            ctx.beginPath();
+            ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
+            ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.45, -p.size * 0.35, -p.size * 0.15);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(p.size * 0.2, -p.size * 0.3);
+            ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.45, p.size * 0.35, -p.size * 0.15);
+            ctx.fill();
+            ctx.stroke();
+            // Face
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(-p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2); // Left eye
+            ctx.arc(p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2); // Right eye
+            ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2); // Nose
+            ctx.fill();
+            // Mouth
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-p.size*0.1, -p.size*0.1);
+            ctx.quadraticCurveTo(0, -p.size*0.07, p.size*0.1, -p.size*0.1);
+            ctx.stroke();
+            // Eyebrows
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-p.size * 0.22, -p.size * 0.4);
+            ctx.lineTo(-p.size * 0.1, -p.size * 0.3);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(p.size * 0.22, -p.size * 0.4);
+            ctx.lineTo(p.size * 0.1, -p.size * 0.3);
             ctx.stroke();
             ctx.restore();
         }
         
         function drawTetsuji(npc) {
-            // Simplified Tetsuji
             ctx.save();
             ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
-            ctx.fillStyle = '#f5deb3'; // Beige
+            const p = { size: TILE_SIZE };
+
+            // Body
+            ctx.fillStyle = '#f5deb3';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 2;
-             // Body & Head
             ctx.beginPath();
-            ctx.ellipse(0, TILE_SIZE*0.1, TILE_SIZE*0.4, TILE_SIZE*0.35, 0, 0, Math.PI * 2);
-            ctx.ellipse(0, -TILE_SIZE*0.15, TILE_SIZE*0.4, TILE_SIZE*0.28, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, p.size * 0.25, p.size * 0.5, p.size * 0.3, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
+
+            // Head
+            ctx.beginPath();
+            ctx.ellipse(0, -p.size * 0.1, p.size * 0.4, p.size * 0.28, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Ears
+            ctx.beginPath();
+            ctx.ellipse(-p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.ellipse(p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
             // Muzzle
             ctx.fillStyle = '#3d3532';
             ctx.beginPath();
-            ctx.ellipse(0, -TILE_SIZE*0.05, TILE_SIZE*0.25, TILE_SIZE*0.1, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, p.size * 0.25, p.size * 0.1, 0, 0, Math.PI * 2);
             ctx.fill();
+
+            // Eyes & Nose
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(-p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2); // Left eye
+            ctx.arc( p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2); // Right eye
+            ctx.arc( 0, p.size * 0.02, p.size * 0.04, 0, Math.PI * 2); // Nose
+            ctx.fill();
+            
+            // Eye highlights
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(-p.size * 0.13, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
+            ctx.arc( p.size * 0.17, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Mouth
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-p.size * 0.08, p.size * 0.08);
+            ctx.quadraticCurveTo(0, p.size * 0.12, p.size * 0.08, p.size * 0.08);
+            ctx.stroke();
+
             // Eyebrows
             ctx.strokeStyle = '#3d3532';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.arc(-TILE_SIZE*0.15, -TILE_SIZE*0.25, TILE_SIZE*0.1, Math.PI, Math.PI*2);
+            ctx.moveTo(-p.size * 0.2, -p.size * 0.22);
+            ctx.quadraticCurveTo(-p.size * 0.12, -p.size * 0.3, -p.size * 0.04, -p.size * 0.22);
             ctx.stroke();
             ctx.beginPath();
-            ctx.arc(TILE_SIZE*0.15, -TILE_SIZE*0.25, TILE_SIZE*0.1, Math.PI, Math.PI*2);
+            ctx.moveTo(p.size * 0.2, -p.size * 0.22);
+            ctx.quadraticCurveTo(p.size * 0.12, -p.size * 0.3, p.size * 0.04, -p.size * 0.22);
             ctx.stroke();
+
             ctx.restore();
         }
 
@@ -366,7 +443,7 @@
 
         function checkWinCondition() {
             if (glitches.every(g => g.fixed)) {
-                showDialogue("やった！世界の綻びを直したぞ！これでみんな安心だ！", 5000, "ロセツ", true);
+                showDialogue("やった！全部の綻びを直したぞ！これでみんな安心だ！", 5000, "ロセツ", true);
             }
         }
         
@@ -414,7 +491,7 @@
         function handleKeyPress(e) {
              if (!gameStarted) {
                 gameStarted = true;
-                showDialogue("また山の様子が変だ…パトロールしなきゃ！", 4000);
+                showDialogue("また庭の様子が変だ…パトロールしなきゃ！", 4000);
             }
             if (e.key.startsWith('Arrow')) {
                 keys[e.key] = true;
