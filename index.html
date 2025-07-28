@@ -65,7 +65,7 @@
         <button id="btn-left" class="control-btn bg-gray-700 text-white p-4 rounded-lg shadow-md">←</button>
         <button id="btn-down" class="control-btn bg-gray-700 text-white p-4 rounded-lg shadow-md">↓</button>
         <button id="btn-right" class="control-btn bg-gray-700 text-white p-4 rounded-lg shadow-md">→</button>
-        <button id="btn-action" class="control-btn bg-blue-600 text-white p-4 rounded-lg shadow-md col-span-3">会話 / 直す</button>
+        <button id="btn-action" class="control-btn bg-blue-600 text-white p-4 rounded-lg shadow-md col-span-3">TALK / CHECK</button>
     </div>
 
     <script type="module">
@@ -109,7 +109,7 @@
             row.forEach((tile, x) => {
                 const pos = { x: x * TILE_SIZE, y: y * TILE_SIZE };
                 if (tile === 5) { // Komaru
-                    npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセツか。この世界の綻びは、タフガイならすぐに見つけちまうぜ！" });
+                    npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセツちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！" });
                 } else if (tile === 6) { // Tetsuji
                     npcs.push({ ...pos, id: 'tetsuji', type: 6, dialogue: "うぅ…首輪についてた大事な野球ボールが、変な光と共になくなっちゃったんだ…" });
                 } else if (tile === 7 || tile === 8) { // Glitches
