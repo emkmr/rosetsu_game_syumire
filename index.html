@@ -109,11 +109,11 @@
             row.forEach((tile, x) => {
                 const pos = { x: x * TILE_SIZE, y: y * TILE_SIZE };
                 if (tile === 5) { // Komaru
-                    npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセツちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！" });
+                    npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！" });
                 } else if (tile === 6) { // Tetsuji
-                    npcs.push({ ...pos, id: 'tetsuji', type: 6, dialogue: "うぅ…首輪についてた大事な野球ボールが、変な光と共になくなっちゃったんだ…" });
+                    npcs.push({ ...pos, id: 'tetsuji', type: 6, dialogue: "うぅ…首輪についてたももちゃんにもらった大事な野球ボールが、変な光と共になくなっちゃったんだ…" });
                 } else if (tile === 7 || tile === 8) { // Glitches
-                    glitches.push({ ...pos, size: TILE_SIZE, id: tile === 7 ? 'normal' : 'ball', fixed: false, flicker: 0 });
+                    glitches.push({ ...pos, size: TILE_SIZE, id: tile === 7 ? 'normal' : 'ball', fixed: false, flicker: 0, vx: 0, vy: 0 });
                 }
             });
         });
@@ -371,6 +371,38 @@
             movePlayer(dx, dy);
         }
 
+        function updateGlitches() {
+            glitches.forEach(g => {
+                // Only move the ball if the quest is active and it's not fixed
+                if (g.id === 'ball' && !g.fixed && tetsujiQuestAccepted) {
+                    // Start moving if it hasn't started yet
+                    if (g.vx === 0 && g.vy === 0) {
+                        g.vx = (Math.random() - 0.5) * 5 + 1; // Random initial speed
+                        g.vy = (Math.random() - 0.5) * 5 + 1;
+                    }
+
+                    g.x += g.vx;
+                    g.y += g.vy;
+
+                    // Bounce off walls (simple boundary check)
+                    const playableAreaMargin = TILE_SIZE;
+                    if (g.x < playableAreaMargin || g.x + g.size > MAP_WIDTH - playableAreaMargin) {
+                        g.vx *= -1;
+                    }
+                    if (g.y < playableAreaMargin || g.y + g.size > MAP_HEIGHT - playableAreaMargin) {
+                        g.vy *= -1;
+                    }
+
+                    // Check for collision with player (catch)
+                    const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
+                    if (dist < player.size / 2 + (g.size / 3)) { // Using g.size/3 as the ball's radius
+                        g.fixed = true;
+                        handleGlitchFix('ball');
+                    }
+                }
+            });
+        }
+
         function movePlayer(dx, dy) {
             const nextX = player.x + dx;
             const nextY = player.y + dy;
@@ -402,30 +434,38 @@
             npcs.forEach(npc => {
                 const dist = Math.hypot((player.x + player.size/2) - (npc.x + TILE_SIZE/2), (player.y + player.size/2) - (npc.y + TILE_SIZE/2));
                 if (dist < TILE_SIZE * 1.2) {
-                    showDialogue(npc.dialogue, 4000, npc.id);
+                    // If it's the first time talking to Tetsuji and the quest hasn't been accepted
                     if (npc.id === 'tetsuji' && !tetsujiQuestAccepted) {
-                        tetsujiQuestAccepted = true;
+                        tetsujiQuestAccepted = true; // Accept the quest
+                        
+                        // 1. Show Tetsuji's initial dialogue
+                        showDialogue(npc.dialogue, 3000, npc.id);
+                        
+                        // 2. After a delay, show Rosetsu's reaction. The ball will start moving automatically.
+                        setTimeout(() => {
+                            showDialogue("大変だ！あのボール、すごい勢いで動き出したぞ！", 3000, "ロセツ");
+                        }, 3100); // Delay should be slightly longer than the dialogue duration
+                    } else {
+                        // For all other interactions (Komaru, or Tetsuji after the quest has started)
+                        showDialogue(npc.dialogue, 4000, npc.id);
                     }
                     interacted = true;
                 }
             });
             if (interacted) return;
 
-            // Glitch interaction
+            // Static Glitch interaction
             glitches.forEach(g => {
-                if (!g.fixed) {
+                if (g.id === 'normal' && !g.fixed) {
                     const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
                     if (dist < TILE_SIZE) {
-                        if (g.id === 'ball' && !tetsujiQuestAccepted) {
-                            showDialogue("なんだろうこれ…？誰かのものかな？", 3000);
-                            return;
-                        }
                         g.fixed = true;
                         interacted = true;
-                        handleGlitchFix(g.id);
+                        handleGlitchFix('normal');
                     }
                 }
             });
+
             if (!interacted) {
                 showDialogue("クンクン…特に何もないみたいだ。", 2000, "ロセツ");
             }
@@ -435,16 +475,16 @@
             if (glitchId === 'ball') {
                 showDialogue("この野球ボール…鉄二くんのだ！返してあげなきゃ！", 3000, "ロセツ");
                 const tetsuji = npcs.find(n => n.id === 'tetsuji');
-                tetsuji.dialogue = "わー！僕のボールだ！ありがとう、ロセツ！君はヒーローだね！";
+                tetsuji.dialogue = "わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！";
             } else {
-                showDialogue("よし、世界の綻びを直した！", 3000, "ロセツ");
+                showDialogue("よし、世界のバグを直した！", 3000, "ロセツ");
             }
             checkWinCondition();
         }
 
         function checkWinCondition() {
             if (glitches.every(g => g.fixed)) {
-                showDialogue("やった！全部の綻びを直したぞ！これでみんな安心だ！", 5000, "ロセツ", true);
+                showDialogue("やった！全部のバグを直したぞ！これでみんな安心だ！", 5000, "ロセツ", true);
             }
         }
         
@@ -481,6 +521,8 @@
         // --- Game Loop & Controls ---
         function gameLoop() {
             update();
+            updateGlitches(); // Add this line to update glitch movements
+            
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawMap();
             drawNPCs();
@@ -492,7 +534,7 @@
         function handleKeyPress(e) {
              if (!gameStarted) {
                 gameStarted = true;
-                showDialogue("また庭の様子が変だ…パトロールしなきゃ！", 4000);
+                showDialogue("お外の様子が変だ…パトロールしなきゃ！", 4000);
             }
             if (e.key.startsWith('Arrow')) {
                 keys[e.key] = true;
