@@ -21,6 +21,9 @@
             image-rendering: -webkit-crisp-edges;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            /* Add responsive scaling */
+            width: 100%;
+            height: auto;
         }
         .control-btn {
             transition: all 0.1s ease-in-out;
@@ -523,11 +526,31 @@
             update();
             updateGlitches(); // Add this line to update glitch movements
             
+            // Calculate camera position to center the player
+            const cameraX = Math.max(0, Math.min(
+                player.x + player.size / 2 - canvas.width / 2,
+                MAP_WIDTH - canvas.width
+            ));
+            const cameraY = Math.max(0, Math.min(
+                player.y + player.size / 2 - canvas.height / 2,
+                MAP_HEIGHT - canvas.height
+            ));
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Apply camera transformation
+            ctx.save();
+            ctx.translate(-cameraX, -cameraY);
+
+            // Draw all game objects at their absolute positions
             drawMap();
             drawNPCs();
             drawGlitches();
             drawRosetsu(player);
+
+            // Restore context to pre-transformation state
+            ctx.restore();
+
             requestAnimationFrame(gameLoop);
         }
 
