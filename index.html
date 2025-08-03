@@ -5,11 +5,94 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Rosetsu and the Simulated World</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #000;
+            overflow: hidden;
+            margin: 0;
+        }
+        
+        /* --- Opening Styles --- */
+        .perspective-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            perspective: 400px;
+            perspective-origin: 50% 60%;
+        }
+        .crawl-container {
+            position: absolute;
+            top: 100%;
+            width: 80%;
+            max-width: 800px;
+            left: 50%;
+            transform: translateX(-50%);
+            transform-origin: 50% 100%;
+            animation: crawl 50s linear forwards;
+        }
+        .crawl-content {
+            color: #feda4a;
+            font-size: 5.5vw;
+            line-height: 1.4;
+            text-align: justify;
+            font-weight: bold;
+            transform: rotateX(20deg);
+        }
+        @media (min-width: 768px) {
+            .crawl-content {
+                font-size: 42px;
+            }
+        }
+        @keyframes crawl {
+            from { top: 100%; }
+            to { top: -200%; }
+        }
+        .game-title-opening {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            color: #feda4a;
+            font-size: 10vw;
+            font-weight: bold;
+            text-align: center;
+            white-space: nowrap;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.5);
+            animation: titleZoom 7s forwards;
+        }
+        @media (min-width: 768px) {
+            .game-title-opening { font-size: 72px; }
+        }
+        @keyframes titleZoom {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+        }
+        .initial-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #49dafd;
+            font-size: 3em;
+            font-weight: bold;
+            text-align: center;
+            opacity: 0;
+            animation: initialFade 5s forwards;
+        }
+        @keyframes initialFade {
+            0% { opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* --- Game Styles --- */
+        .game-body {
             font-family: 'M PLUS Rounded 1c', sans-serif;
-            touch-action: manipulation; /* iOSでのダブルタップズーム防止 */
+            background-color: #f0f0f0;
         }
         canvas {
             background-color: #f0f0f0;
@@ -21,12 +104,12 @@
             image-rendering: -webkit-crisp-edges;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
-            width: 100%; /* Make canvas responsive */
+            width: 100%;
             height: auto;
         }
         .control-btn {
             transition: all 0.1s ease-in-out;
-            user-select: none; /* ボタンのテキスト選択を無効化 */
+            user-select: none;
         }
         .control-btn:active {
             transform: scale(0.9);
@@ -36,37 +119,93 @@
             animation: slide-up 0.5s ease-out forwards;
         }
         @keyframes slide-up {
-            from {
-                transform: translateY(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
     </style>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
-
-    <div id="game-container" class="w-full max-w-2xl mx-auto">
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">Rosetsu and the Simulated World</h1>
-        <canvas id="gameCanvas"></canvas>
+<body>
+    <!-- Opening Sequence -->
+    <div id="openingSequence">
+        <div id="initialText" class="initial-text">
+            <p>昔々<br>遥か彼方の銀河系で・・・・・・</p>
+        </div>
+        <div id="gameTitleOpening" class="game-title-opening" style="display: none;">
+            <p>Rosetsu and the Simulated World</p>
+        </div>
+        <div id="perspectiveContainer" class="perspective-container" style="display: none;">
+            <div id="crawlContainer" class="crawl-container">
+                <div class="crawl-content">
+                    <p>それは、食べてもなくならないドッグフードから始まった。小さな違和感は、やがて世界の真実へと繋がる。一匹のチワワが、世界の運命をその鼻先に委ねられる。</p>
+                    <p>白いチワワの男の子「ロセツ」。彼の日常は、温かい家族と優しい時間で満たされているはずだった。</p>
+                    <p>しかし、その生まれつき鋭すぎる嗅覚と聴覚は、人間には決して気づけない世界の“ノイズ”を拾ってしまう。木の中から聞こえるはずのない電子音、昨日まで存在しなかった公園のブランコ、そして、何度食べても満たされることのない不思議なドッグフード。</p>
+                    <p>それらはすべて、この世界が精巧なシミュレーションであり、今まさに崩壊の危機にあることを示す「バグ」だった。</p>
+                    <p>このまま綻びが広がれば、大好きな家族の笑顔も、共に過ごした温かい記憶も、すべてがエラーコードの彼方に消えてしまうかもしれない。</p>
+                    <p>ロセツは小さな胸に決意を秘める。</p>
+                    <p>家族との当たり前の毎日を守るため、この世界の真実を突き止め、すべての「綻び」を修復する冒険に出ることを。</p>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div id="dialogue-container" class="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-10">
-        <!-- Dialogue box will be inserted here by JS -->
+    <!-- Main Game (Initially Hidden) -->
+    <div id="mainGame" style="display: none;" class="flex flex-col items-center justify-center min-h-screen p-4">
+        <div id="game-container" class="w-full max-w-2xl mx-auto">
+            <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">Rosetsu and the Simulated World</h1>
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        <div id="dialogue-container" class="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-10"></div>
+        <div id="controls" class="mt-4 grid grid-cols-3 gap-2 w-full max-w-xs">
+            <div></div>
+            <button id="btn-up" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↑</button>
+            <div></div>
+            <button id="btn-left" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">←</button>
+            <button id="btn-down" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↓</button>
+            <button id="btn-right" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">→</button>
+            <button id="btn-action" class="control-btn bg-lime-400 text-white p-4 rounded-lg shadow-md col-span-3">TALK / CHECK</button>
+        </div>
     </div>
 
-    <div id="controls" class="mt-4 grid grid-cols-3 gap-2 w-full max-w-xs md:hidden">
-        <div></div>
-        <button id="btn-up" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↑</button>
-        <div></div>
-        <button id="btn-left" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">←</button>
-        <button id="btn-down" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↓</button>
-        <button id="btn-right" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">→</button>
-        <button id="btn-action" class="control-btn bg-lime-400 text-white p-4 rounded-lg shadow-md col-span-3">TALK / CHECK</button>
-    </div>
+    <script>
+        // --- Opening Sequence Logic ---
+        const initialText = document.getElementById('initialText');
+        const gameTitleOpening = document.getElementById('gameTitleOpening');
+        const perspectiveContainer = document.getElementById('perspectiveContainer');
+        const crawlContainer = document.getElementById('crawlContainer');
+        const openingSequence = document.getElementById('openingSequence');
+        const mainGame = document.getElementById('mainGame');
+        
+        let openingSkipped = false;
+        function skipOpening() {
+            if (openingSkipped) return;
+            openingSkipped = true;
+
+            openingSequence.style.display = 'none';
+            document.body.classList.add('game-body');
+            mainGame.style.display = 'flex';
+            window.startGame();
+        }
+
+        openingSequence.addEventListener('click', skipOpening);
+        openingSequence.addEventListener('touchstart', skipOpening);
+
+        initialText.addEventListener('animationend', () => {
+            if (openingSkipped) return;
+            initialText.style.display = 'none';
+            gameTitleOpening.style.display = 'block';
+        });
+
+        gameTitleOpening.addEventListener('animationend', () => {
+            if (openingSkipped) return;
+            gameTitleOpening.style.display = 'none';
+            perspectiveContainer.style.display = 'block';
+        });
+
+        crawlContainer.addEventListener('animationend', () => {
+             if (openingSkipped) return;
+             skipOpening();
+        });
+    </script>
 
     <script type="module">
         // --- Game Setup ---
@@ -74,7 +213,6 @@
         const ctx = canvas.getContext('2d');
         const TILE_SIZE = 40;
 
-        // 0: ground, 1: wall, 3: tree, 4: dark_tree, 5: komaru, 6: tetsuji, 7: glitch, 8: ball_glitch
         let map = [
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -129,7 +267,6 @@
             if (p.isMoving) {
                 ctx.translate(0, Math.sin(Date.now() / 100) * 2);
             }
-            // Body
             ctx.fillStyle = 'white';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 2;
@@ -137,12 +274,10 @@
             ctx.ellipse(0, p.size * 0.1, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-            // Head
             ctx.beginPath();
             ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-            // Ears
             ctx.beginPath();
             ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
             ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.5, -p.size * 0.3, -p.size * 0.15);
@@ -153,19 +288,17 @@
             ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.5, p.size * 0.3, -p.size * 0.15);
             ctx.fill();
             ctx.stroke();
-            // Face
             ctx.fillStyle = 'black';
             ctx.beginPath();
-            ctx.arc(-p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2); // Left eye
-            ctx.arc(p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2); // Right eye
-            ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2); // Nose
+            ctx.arc(-p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2);
+            ctx.arc(p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2);
+            ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2);
             ctx.fill();
-            // Ebi Fry T-shirt
-            ctx.fillStyle = '#FF9800'; // Orange for shrimp body
+            ctx.fillStyle = '#FF9800';
             ctx.beginPath();
             ctx.ellipse(0, p.size * 0.15, p.size*0.05, p.size*0.12, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = '#FF7043'; // Lighter orange for tail
+            ctx.fillStyle = '#FF7043';
             ctx.beginPath();
             ctx.moveTo(0, p.size * 0.05);
             ctx.lineTo(-p.size*0.08, p.size*0.02);
@@ -179,20 +312,17 @@
             ctx.save();
             ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
             const p = { size: TILE_SIZE * 0.9 };
-            // Body
             ctx.fillStyle = 'white';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.ellipse(0, p.size * 0.15, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2); // Body
+            ctx.ellipse(0, p.size * 0.15, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-            // Head
             ctx.beginPath();
-            ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2); // Head
+            ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-            // Ears
             ctx.beginPath();
             ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
             ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.45, -p.size * 0.35, -p.size * 0.15);
@@ -203,21 +333,18 @@
             ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.45, p.size * 0.35, -p.size * 0.15);
             ctx.fill();
             ctx.stroke();
-            // Face
             ctx.fillStyle = 'black';
             ctx.beginPath();
-            ctx.arc(-p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2); // Left eye
-            ctx.arc(p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2); // Right eye
-            ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2); // Nose
+            ctx.arc(-p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2);
+            ctx.arc(p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2);
+            ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2);
             ctx.fill();
-            // Mouth
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(-p.size*0.1, -p.size*0.1);
             ctx.quadraticCurveTo(0, -p.size*0.07, p.size*0.1, -p.size*0.1);
             ctx.stroke();
-            // Eyebrows
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(-p.size * 0.22, -p.size * 0.4);
@@ -234,8 +361,6 @@
             ctx.save();
             ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
             const p = { size: TILE_SIZE };
-
-            // Body
             ctx.fillStyle = '#f5deb3';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 2;
@@ -243,14 +368,10 @@
             ctx.ellipse(0, p.size * 0.25, p.size * 0.5, p.size * 0.3, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-
-            // Head
             ctx.beginPath();
             ctx.ellipse(0, -p.size * 0.1, p.size * 0.4, p.size * 0.28, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-
-            // Ears
             ctx.beginPath();
             ctx.ellipse(-p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
             ctx.fill();
@@ -259,37 +380,27 @@
             ctx.ellipse(p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-
-            // Muzzle
             ctx.fillStyle = '#3d3532';
             ctx.beginPath();
             ctx.ellipse(0, 0, p.size * 0.25, p.size * 0.1, 0, 0, Math.PI * 2);
             ctx.fill();
-
-            // Eyes & Nose
             ctx.fillStyle = 'black';
             ctx.beginPath();
-            ctx.arc(-p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2); // Left eye
-            ctx.arc( p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2); // Right eye
-            ctx.arc( 0, p.size * 0.02, p.size * 0.04, 0, Math.PI * 2); // Nose
+            ctx.arc(-p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2);
+            ctx.arc( p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2);
+            ctx.arc( 0, p.size * 0.02, p.size * 0.04, 0, Math.PI * 2);
             ctx.fill();
-            
-            // Eye highlights
             ctx.fillStyle = 'white';
             ctx.beginPath();
             ctx.arc(-p.size * 0.13, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
             ctx.arc( p.size * 0.17, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
             ctx.fill();
-
-            // Mouth
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(-p.size * 0.08, p.size * 0.08);
             ctx.quadraticCurveTo(0, p.size * 0.12, p.size * 0.08, p.size * 0.08);
             ctx.stroke();
-
-            // Eyebrows
             ctx.strokeStyle = '#3d3532';
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
@@ -301,7 +412,6 @@
             ctx.moveTo(p.size * 0.2, -p.size * 0.22);
             ctx.quadraticCurveTo(p.size * 0.12, -p.size * 0.3, p.size * 0.04, -p.size * 0.22);
             ctx.stroke();
-
             ctx.restore();
         }
 
@@ -336,7 +446,6 @@
                     g.flicker = (g.flicker + 1) % 40;
                     ctx.globalAlpha = 0.7 + Math.sin(Date.now() / 200) * 0.3;
                     if (g.id === 'ball') {
-                        // Draw as a flickering baseball
                         ctx.fillStyle = 'white';
                         ctx.beginPath();
                         ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2);
@@ -349,7 +458,6 @@
                         ctx.beginPath();
                         ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/4, Math.PI*1.2, Math.PI*1.8);
                         ctx.stroke();
-
                     } else {
                         ctx.fillStyle = colors[Math.floor(g.flicker / 10)];
                         ctx.fillRect(g.x, g.y, g.size, g.size);
@@ -373,18 +481,13 @@
 
         function updateGlitches() {
             glitches.forEach(g => {
-                // Only move the ball if the quest is active and it's not fixed
                 if (g.id === 'ball' && !g.fixed && tetsujiQuestAccepted) {
-                    // Start moving if it hasn't started yet
                     if (g.vx === 0 && g.vy === 0) {
-                        g.vx = (Math.random() - 0.5) * 4 + 2; // Random initial speed
-                        g.vy = (Math.random() - 0.5) * 4 + 2;
+                        g.vx = (Math.random() - 0.5) * 5 + 1;
+                        g.vy = (Math.random() - 0.5) * 5 + 1;
                     }
-
                     g.x += g.vx;
                     g.y += g.vy;
-
-                    // Bounce off walls (simple boundary check)
                     const playableAreaMargin = TILE_SIZE;
                     if (g.x < playableAreaMargin || g.x + g.size > MAP_WIDTH - playableAreaMargin) {
                         g.vx *= -1;
@@ -392,10 +495,8 @@
                     if (g.y < playableAreaMargin || g.y + g.size > MAP_HEIGHT - playableAreaMargin) {
                         g.vy *= -1;
                     }
-
-                    // Check for collision with player (catch)
                     const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
-                    if (dist < player.size / 2 + (g.size / 3)) { // Using g.size/3 as the ball's radius
+                    if (dist < player.size / 2 + (g.size / 3)) {
                         g.fixed = true;
                         handleGlitchFix('ball');
                     }
@@ -430,23 +531,16 @@
 
         function interact() {
             let interacted = false;
-            // NPC interaction
             npcs.forEach(npc => {
                 const dist = Math.hypot((player.x + player.size/2) - (npc.x + TILE_SIZE/2), (player.y + player.size/2) - (npc.y + TILE_SIZE/2));
                 if (dist < TILE_SIZE * 1.2) {
-                    // If it's the first time talking to Tetsuji and the quest hasn't been accepted
                     if (npc.id === 'tetsuji' && !tetsujiQuestAccepted) {
-                        tetsujiQuestAccepted = true; // Accept the quest
-                        
-                        // 1. Show Tetsuji's initial dialogue
+                        tetsujiQuestAccepted = true;
                         showDialogue(npc.dialogue, 3000, npc.id);
-                        
-                        // 2. After a delay, show Rosetsu's reaction. The ball will start moving automatically.
                         setTimeout(() => {
                             showDialogue("大変だ！あのボール、すごい勢いで動き出したぞ！", 3000, "ロセツ");
-                        }, 3100); // Delay should be slightly longer than the dialogue duration
+                        }, 3100);
                     } else {
-                        // For all other interactions (Komaru, or Tetsuji after the quest has started)
                         showDialogue(npc.dialogue, 4000, npc.id);
                     }
                     interacted = true;
@@ -454,7 +548,6 @@
             });
             if (interacted) return;
 
-            // Static Glitch interaction
             glitches.forEach(g => {
                 if (g.id === 'normal' && !g.fixed) {
                     const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
@@ -493,7 +586,7 @@
             const container = document.getElementById('dialogue-container');
             clearTimeout(dialogueTimeout);
             
-            let speakerColor = "text-pink-500"; // Rosetsu
+            let speakerColor = "text-pink-500";
             if(speaker === 'komaru') speakerColor = "text-green-600";
             if(speaker === 'tetsuji') speakerColor = "text-yellow-700";
             
@@ -518,52 +611,42 @@
             }, duration);
         }
 
-        // --- Game Loop & Controls ---
-        function gameLoop() {
-            update();
-            updateGlitches(); // Add this line to update glitch movements
+        // --- Game Start Function ---
+        window.startGame = function() {
+            function gameLoop() {
+                update();
+                updateGlitches();
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawMap();
+                drawNPCs();
+                drawGlitches();
+                drawRosetsu(player);
+                requestAnimationFrame(gameLoop);
+            }
+
+            function handleTouchStart(e) {
+                if (!gameStarted) {
+                    gameStarted = true;
+                    showDialogue("お外の様子が変だ…パトロールしなきゃ！", 4000);
+                }
+            }
+            canvas.addEventListener('touchstart', handleTouchStart, { once: true });
+
+            const setupBtn = (id, dir) => {
+                const btn = document.getElementById(id);
+                btn.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = true; if (!gameStarted) gameStarted = true; });
+                btn.addEventListener('pointerup', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
+                btn.addEventListener('pointerleave', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
+            };
+            setupBtn('btn-up', 'Up');
+            setupBtn('btn-down', 'Down');
+            setupBtn('btn-left', 'Left');
+            setupBtn('btn-right', 'Right');
+            document.getElementById('btn-action').addEventListener('click', (e) => { e.preventDefault(); if (!gameStarted) gameStarted = true; interact(); });
             
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawMap();
-            drawNPCs();
-            drawGlitches();
-            drawRosetsu(player);
-            requestAnimationFrame(gameLoop);
+            showDialogue("ゲーム画面をタップしてスタート！", 5000, "システム");
+            gameLoop();
         }
-
-        // This function is for keyboard controls, which you wanted to remove, but we keep it for potential future use or testing.
-        function handleKeyPress(e) {
-             if (!gameStarted) {
-                gameStarted = true;
-                showDialogue("お外の様子が変だ…パトロールしなきゃ！", 4000);
-            }
-            if (e.key.startsWith('Arrow')) {
-                keys[e.key] = true;
-            }
-            if (e.code === 'Space') interact();
-        }
-        
-        window.addEventListener('keydown', handleKeyPress);
-        window.addEventListener('keyup', (e) => {
-            if (e.key.startsWith('Arrow')) keys[e.key] = false;
-        });
-
-        // Touch Controls
-        const controls = { up: false, down: false, left: false, right: false };
-        const setupBtn = (id, dir) => {
-            const btn = document.getElementById(id);
-            btn.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = true; if (!gameStarted) gameStarted = true; });
-            btn.addEventListener('pointerup', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
-            btn.addEventListener('pointerleave', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
-        };
-        setupBtn('btn-up', 'Up');
-        setupBtn('btn-down', 'Down');
-        setupBtn('btn-left', 'Left');
-        setupBtn('btn-right', 'Right');
-        document.getElementById('btn-action').addEventListener('click', (e) => { e.preventDefault(); if (!gameStarted) gameStarted = true; interact(); });
-        
-        showDialogue("ゲーム画面をタップしてスタート！", 5000, "システム");
-        gameLoop();
     </script>
 </body>
 </html>
