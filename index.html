@@ -97,14 +97,14 @@
             width: 100%;
             color: #feda4a;
             font-weight: bold;
-            text-align: center; /* Changed back to center for proper animation */
+            text-align: center;
             opacity: 0;
             transform: translate(-50%, -50%) scale(1.5);
             animation: titleZoom 7s forwards;
         }
         .main-title {
             font-size: 10vw;
-            white-space: nowrap; /* Added to prevent wrapping */
+            white-space: nowrap; /* Prevents the title from wrapping to a new line */
         }
         @media (min-width: 768px) {
             .main-title { font-size: 72px; }
@@ -251,13 +251,13 @@
         initialText.addEventListener('animationend', () => {
             if (openingSkipped) return;
             initialText.style.display = 'none';
+            starsContainer.style.display = 'block'; // Show stars with the title
             gameTitleOpening.style.display = 'block';
         });
 
         gameTitleOpening.addEventListener('animationend', () => {
             if (openingSkipped) return;
             gameTitleOpening.style.display = 'none';
-            starsContainer.style.display = 'block'; // Show stars
             perspectiveContainer.style.display = 'block';
         });
 
@@ -709,4 +709,4 @@
         }
     </script>
 </body>
-</ht
+</html>
