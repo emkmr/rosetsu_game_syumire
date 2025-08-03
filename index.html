@@ -97,13 +97,14 @@
             width: 100%;
             color: #feda4a;
             font-weight: bold;
-            text-align: center;
+            text-align: center; /* Changed back to center for proper animation */
             opacity: 0;
             transform: translate(-50%, -50%) scale(1.5);
             animation: titleZoom 7s forwards;
         }
         .main-title {
             font-size: 10vw;
+            white-space: nowrap; /* Added to prevent wrapping */
         }
         @media (min-width: 768px) {
             .main-title { font-size: 72px; }
@@ -124,7 +125,6 @@
             text-align: left;
             opacity: 0;
             animation: initialFade 5s forwards;
-            white-space: nowrap;
         }
         @media (min-width: 768px) {
             .initial-text {
@@ -182,8 +182,8 @@
         </div>
 
         <div id="initialText" class="initial-text">
-            <p>遠い昔　　はるかかなたの</p> <!-- 半角スペース2つでやや広めに -->
-    <p>銀河系で・・・</p>
+            <p>遠い昔　　はるかかなたの</p>
+            <p>銀河系で・・・</p>
         </div>
         <div id="gameTitleOpening" class="game-title-opening" style="display: none;">
             <p class="main-title">Rosetsu and the Simulated World</p>
@@ -709,4 +709,4 @@
         }
     </script>
 </body>
-</html>
+</ht
