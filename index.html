@@ -21,8 +21,7 @@
             image-rendering: -webkit-crisp-edges;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
-            /* Add responsive scaling */
-            width: 100%;
+            width: 100%; /* Make canvas responsive */
             height: auto;
         }
         .control-btn {
@@ -50,10 +49,9 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div id="game-container" class="w-full max-w-lg mx-auto">
+    <div id="game-container" class="w-full max-w-2xl mx-auto">
         <h1 class="text-2xl font-bold text-center text-gray-800 mb-1">この世界が本物である確率は？</h1>
-        <h2 class="text-md font-semibold text-center text-gray-500 mb-2">- ロセツ🍤シミュレーション仮説 -</h2>
-        <p class="text-sm text-center text-gray-600 mb-4">PC: [矢印キー]で移動, [スペース]でTALK/CHECK</p>
+        <h2 class="text-md font-semibold text-center text-gray-500 mb-4">- ロセツ🍤シミュレーション仮説 -</h2>
         <canvas id="gameCanvas"></canvas>
     </div>
 
@@ -65,10 +63,10 @@
         <div></div>
         <button id="btn-up" class="control-btn bg-gray-700 text-white p-4 rounded-lg shadow-md">↑</button>
         <div></div>
-        <button id="btn-left" class="control-btn bg-gray-700 text-white p-4 rounded-lg shadow-md">←</button>
-        <button id="btn-down" class="control-btn bg-gray-700 text-white p-4 rounded-lg shadow-md">↓</button>
-        <button id="btn-right" class="control-btn bg-gray-700 text-white p-4 rounded-lg shadow-md">→</button>
-        <button id="btn-action" class="control-btn bg-sky-300 text-white p-4 rounded-lg shadow-md col-span-3">TALK / CHECK</button>
+        <button id="btn-left" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">←</button>
+        <button id="btn-down" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↓</button>
+        <button id="btn-right" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">→</button>
+        <button id="btn-action" class="control-btn bg-lime-400 text-white p-4 rounded-lg shadow-md col-span-3">TALK / CHECK</button>
     </div>
 
     <script type="module">
@@ -124,10 +122,8 @@
         let keys = {};
         let gameStarted = false;
         let tetsujiQuestAccepted = false;
-        let ballIsMoving = false; // ★修正点1: ボールの動きを制御するフラグを追加
 
         // --- Character Drawing Functions ---
-        // (描画関数は変更なし)
         function drawRosetsu(p) {
             ctx.save();
             ctx.translate(p.x + p.size / 2, p.y + p.size / 2);
@@ -378,8 +374,8 @@
 
         function updateGlitches() {
             glitches.forEach(g => {
-                // ★修正点2: ボールが動く条件を tetsujiQuestAccepted から ballIsMoving に変更
-                if (g.id === 'ball' && !g.fixed && ballIsMoving) {
+                // Only move the ball if the quest is active and it's not fixed
+                if (g.id === 'ball' && !g.fixed && tetsujiQuestAccepted) {
                     // Start moving if it hasn't started yet
                     if (g.vx === 0 && g.vy === 0) {
                         g.vx = (Math.random() - 0.5) * 5 + 1; // Random initial speed
@@ -402,7 +398,6 @@
                     const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
                     if (dist < player.size / 2 + (g.size / 3)) { // Using g.size/3 as the ball's radius
                         g.fixed = true;
-                        ballIsMoving = false; // 捕まえたら動きを止める
                         handleGlitchFix('ball');
                     }
                 }
@@ -434,82 +429,68 @@
             return false;
         }
 
-        // ★修正点3: インタラクト処理を全面的に見直し
         function interact() {
             let interacted = false;
-
-            // 1. NPCとの会話をチェック
-            for (const npc of npcs) {
-                const dist = Math.hypot((player.x + player.size / 2) - (npc.x + TILE_SIZE / 2), (player.y + player.size / 2) - (npc.y + TILE_SIZE / 2));
+            // NPC interaction
+            npcs.forEach(npc => {
+                const dist = Math.hypot((player.x + player.size/2) - (npc.x + TILE_SIZE/2), (player.y + player.size/2) - (npc.y + TILE_SIZE/2));
                 if (dist < TILE_SIZE * 1.2) {
+                    // If it's the first time talking to Tetsuji and the quest hasn't been accepted
                     if (npc.id === 'tetsuji' && !tetsujiQuestAccepted) {
-                        tetsujiQuestAccepted = true;
-                        showDialogue(npc.dialogue, 5000, npc.id);
-                        // ボールを動かさず、ヒントを表示する
+                        tetsujiQuestAccepted = true; // Accept the quest
+                        
+                        // 1. Show Tetsuji's initial dialogue
+                        showDialogue(npc.dialogue, 3000, npc.id);
+                        
+                        // 2. After a delay, show Rosetsu's reaction. The ball will start moving automatically.
                         setTimeout(() => {
-                            showDialogue("（変な光…？あっちで光っているのがボールかな…調べてみよう）", 5000, "ロセツ");
-                        }, 5100); 
+                            showDialogue("大変だ！あのボール、すごい勢いで動き出したぞ！", 3000, "ロセツ");
+                        }, 3100); // Delay should be slightly longer than the dialogue duration
                     } else {
-                        // 会話時間を長くする
-                        showDialogue(npc.dialogue, 5000, npc.id);
+                        // For all other interactions (Komaru, or Tetsuji after the quest has started)
+                        showDialogue(npc.dialogue, 4000, npc.id);
                     }
                     interacted = true;
-                    break; 
                 }
-            }
+            });
             if (interacted) return;
 
-            // 2. Glitchとのインタラクションをチェック
-            for (const g of glitches) {
-                if (!g.fixed) {
-                    const dist = Math.hypot((player.x + player.size / 2) - (g.x + TILE_SIZE / 2), (player.y + player.size / 2) - (g.y + TILE_SIZE / 2));
+            // Static Glitch interaction
+            glitches.forEach(g => {
+                if (g.id === 'normal' && !g.fixed) {
+                    const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
                     if (dist < TILE_SIZE) {
-                        if (g.id === 'normal') {
-                            g.fixed = true;
-                            handleGlitchFix('normal');
-                            interacted = true;
-                            break;
-                        }
-                        // ボールグリッチの処理
-                        if (g.id === 'ball') {
-                            if (!tetsujiQuestAccepted) {
-                                showDialogue("なんだろう、この光るボールは…？", 4000, "ロセツ");
-                            } else if (!ballIsMoving) { // クエストを受けていて、まだ動いていない場合
-                                ballIsMoving = true;
-                                showDialogue("うわっ！すごい勢いで動き出した！捕まえなきゃ！", 4000, "ロセツ");
-                            }
-                            interacted = true;
-                            break;
-                        }
+                        g.fixed = true;
+                        interacted = true;
+                        handleGlitchFix('normal');
                     }
                 }
-            }
-            if (interacted) return;
+            });
 
-            // 3. 何もなければ
-            showDialogue("クンクン…特に何もないみたいだ。", 3000, "ロセツ");
+            if (!interacted) {
+                showDialogue("クンクン…特に何もないみたいだ。", 2000, "ロセツ");
+            }
         }
         
         function handleGlitchFix(glitchId) {
             if (glitchId === 'ball') {
-                showDialogue("この野球ボール…鉄二くんのだ！返してあげなきゃ！", 5000, "ロセツ");
+                showDialogue("この野球ボール…鉄二くんのだ！返してあげなきゃ！", 3000, "ロセツ");
                 const tetsuji = npcs.find(n => n.id === 'tetsuji');
                 tetsuji.dialogue = "わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！";
             } else {
-                showDialogue("よし、世界のバグを直した！", 4000, "ロセツ");
+                showDialogue("よし、世界のバグを直した！", 3000, "ロセツ");
             }
             checkWinCondition();
         }
 
         function checkWinCondition() {
             if (glitches.every(g => g.fixed)) {
-                showDialogue("やった！全部のバグを直した！これでみんな安心だ！", 6000, "ロセツ", true);
+                showDialogue("やった！全部のバグを直したぞ！これでみんな安心だ！", 5000, "ロセツ", true);
             }
         }
         
         let dialogueTimeout;
-        // ★修正点4: デフォルトの会話時間を長くする
-        function showDialogue(text, duration = 4000, speaker = "ロセツ", isEnd = false) {
+        function showDialogue(text, duration = 3000, speaker = "ロセツ", isEnd = false) {
             const container = document.getElementById('dialogue-container');
             clearTimeout(dialogueTimeout);
             
@@ -541,36 +522,20 @@
         // --- Game Loop & Controls ---
         function gameLoop() {
             update();
-            updateGlitches(); 
+            updateGlitches(); // Add this line to update glitch movements
             
-            const cameraX = Math.max(0, Math.min(
-                player.x + player.size / 2 - canvas.width / 2,
-                MAP_WIDTH - canvas.width
-            ));
-            const cameraY = Math.max(0, Math.min(
-                player.y + player.size / 2 - canvas.height / 2,
-                MAP_HEIGHT - canvas.height
-            ));
-
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            ctx.save();
-            ctx.translate(-cameraX, -cameraY);
-
             drawMap();
             drawNPCs();
             drawGlitches();
             drawRosetsu(player);
-
-            ctx.restore();
-
             requestAnimationFrame(gameLoop);
         }
 
         function handleKeyPress(e) {
              if (!gameStarted) {
                 gameStarted = true;
-                showDialogue("外の様子が変だ…パトロールしなきゃ！", 5000);
+                showDialogue("お外の様子が変だ…パトロールしなきゃ！", 4000);
             }
             if (e.key.startsWith('Arrow')) {
                 keys[e.key] = true;
