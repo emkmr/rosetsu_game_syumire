@@ -76,11 +76,17 @@
             left: 50%;
             transform: translate(-50%, -50%);
             color: #49dafd;
-            font-size: 3em;
+            font-size: 7vw; /* スマートフォン表示用に調整 */
             font-weight: bold;
             text-align: center;
             opacity: 0;
             animation: initialFade 5s forwards;
+            white-space: nowrap; /* テキストの折り返しを防止 */
+        }
+        @media (min-width: 768px) {
+            .initial-text {
+                font-size: 3em; /* PCでは元のサイズに戻す */
+            }
         }
         @keyframes initialFade {
             0% { opacity: 0; }
