@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Rosetsu and the Simulated World - キャラクター登場編</title>
+    <title>Rosetsu and the Simulated World</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -50,7 +50,7 @@
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
     <div id="game-container" class="w-full max-w-2xl mx-auto">
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-1">Rosetsu and the Simulated World</h1>
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">Rosetsu and the Simulated World</h1>
         <canvas id="gameCanvas"></canvas>
     </div>
 
@@ -377,8 +377,8 @@
                 if (g.id === 'ball' && !g.fixed && tetsujiQuestAccepted) {
                     // Start moving if it hasn't started yet
                     if (g.vx === 0 && g.vy === 0) {
-                        g.vx = (Math.random() - 0.5) * 5 + 1; // Random initial speed
-                        g.vy = (Math.random() - 0.5) * 5 + 1;
+                        g.vx = (Math.random() - 0.5) * 4 + 2; // Random initial speed
+                        g.vy = (Math.random() - 0.5) * 4 + 2;
                     }
 
                     g.x += g.vx;
@@ -531,6 +531,7 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // This function is for keyboard controls, which you wanted to remove, but we keep it for potential future use or testing.
         function handleKeyPress(e) {
              if (!gameStarted) {
                 gameStarted = true;
@@ -561,7 +562,7 @@
         setupBtn('btn-right', 'Right');
         document.getElementById('btn-action').addEventListener('click', (e) => { e.preventDefault(); if (!gameStarted) gameStarted = true; interact(); });
         
-        showDialogue("ゲーム画面をタップするか、キーを押してスタート！", 5000, "システム");
+        showDialogue("ゲーム画面をタップしてスタート！", 5000, "システム");
         gameLoop();
     </script>
 </body>
