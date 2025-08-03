@@ -15,6 +15,38 @@
         }
         
         /* --- Opening Styles --- */
+        #openingSequence {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Starry Background */
+        .stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+        }
+        .stars-small {
+            background-image: radial-gradient(1px 1px at 20px 30px, #eee, rgba(0,0,0,0)), radial-gradient(1px 1px at 40px 70px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 50px 160px, #ddd, rgba(0,0,0,0)), radial-gradient(1px 1px at 90px 40px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 130px 80px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 160px 120px, #ddd, rgba(0,0,0,0));
+            background-size: 200px 200px;
+            animation: zoom 25s infinite;
+        }
+        .stars-medium {
+            background-image: radial-gradient(2px 2px at 50px 50px, #fff, rgba(0,0,0,0)), radial-gradient(2px 2px at 100px 100px, #ddd, rgba(0,0,0,0)), radial-gradient(2px 2px at 200px 150px, #fff, rgba(0,0,0,0));
+            background-size: 300px 300px;
+            animation: zoom 40s infinite;
+        }
+        @keyframes zoom {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
         .perspective-container {
             position: absolute;
             width: 100%;
@@ -40,9 +72,18 @@
             font-weight: bold;
             transform: rotateX(20deg);
         }
+        .crawl-episode-title {
+            text-align: center;
+            font-size: 6vw;
+            margin-bottom: 2em;
+            line-height: 1.2;
+        }
         @media (min-width: 768px) {
             .crawl-content {
                 font-size: 42px;
+            }
+            .crawl-episode-title {
+                font-size: 48px;
             }
         }
         @keyframes crawl {
@@ -53,17 +94,19 @@
             position: absolute;
             top: 50%;
             left: 50%;
+            width: 100%;
             color: #feda4a;
-            font-size: 10vw;
             font-weight: bold;
-            text-align: left;
-            white-space: nowrap;
+            text-align: center;
             opacity: 0;
             transform: translate(-50%, -50%) scale(1.5);
             animation: titleZoom 7s forwards;
         }
+        .main-title {
+            font-size: 10vw;
+        }
         @media (min-width: 768px) {
-            .game-title-opening { font-size: 72px; }
+            .main-title { font-size: 72px; }
         }
         @keyframes titleZoom {
             0% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
@@ -73,19 +116,19 @@
         .initial-text {
             position: absolute;
             top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            left: 5%;
+            transform: translateY(-50%);
             color: #49dafd;
-            font-size: 7vw; /* スマートフォン表示用に調整 */
+            font-size: 7vw;
             font-weight: bold;
             text-align: left;
             opacity: 0;
             animation: initialFade 5s forwards;
-            white-space: nowrap; /* テキストの折り返しを防止 */
+            white-space: nowrap;
         }
         @media (min-width: 768px) {
             .initial-text {
-                font-size: 3em; /* PCでは元のサイズに戻す */
+                font-size: 3em;
             }
         }
         @keyframes initialFade {
@@ -133,15 +176,21 @@
 <body>
     <!-- Opening Sequence -->
     <div id="openingSequence">
+        <div id="starsContainer" style="display: none;">
+            <div class="stars stars-small"></div>
+            <div class="stars stars-medium"></div>
+        </div>
+
         <div id="initialText" class="initial-text">
             <p>昔々<br>遥か彼方の銀河系で・・・・</p>
         </div>
         <div id="gameTitleOpening" class="game-title-opening" style="display: none;">
-            <p>Rosetsu and the Simulated World</p>
+            <p class="main-title">Rosetsu and the Simulated World</p>
         </div>
         <div id="perspectiveContainer" class="perspective-container" style="display: none;">
             <div id="crawlContainer" class="crawl-container">
                 <div class="crawl-content">
+                    <h3 class="crawl-episode-title">エピソード４<br>新たなる覚醒</h3>
                     <p>もし、あなたの信じる日常が、偽りだとしたら？</p>
                     <p>&nbsp;</p> 
                     <p>それは、食べてもなくならないドッグフードから始まった。小さな違和感は、やがて世界の真実へと繋がる。一匹のチワワが、世界の運命をその鼻先に委ねられる。</p>
@@ -182,6 +231,7 @@
         const crawlContainer = document.getElementById('crawlContainer');
         const openingSequence = document.getElementById('openingSequence');
         const mainGame = document.getElementById('mainGame');
+        const starsContainer = document.getElementById('starsContainer');
         
         let openingSkipped = false;
         function skipOpening() {
@@ -206,6 +256,7 @@
         gameTitleOpening.addEventListener('animationend', () => {
             if (openingSkipped) return;
             gameTitleOpening.style.display = 'none';
+            starsContainer.style.display = 'block'; // Show stars
             perspectiveContainer.style.display = 'block';
         });
 
