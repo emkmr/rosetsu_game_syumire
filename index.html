@@ -7,14 +7,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        /* 基本的なスタイルとフォント設定 */
         body {
             font-family: 'Noto Sans JP', sans-serif;
             background-color: #000;
             overflow: hidden;
             margin: 0;
+            height: 100vh; /* ビューポートの高さいっぱいに */
         }
         
-        /* --- Opening Styles --- */
+        /* --- オープニングシーケンスのスタイル --- */
         #openingSequence {
             position: relative;
             width: 100vw;
@@ -22,7 +24,7 @@
             overflow: hidden;
         }
 
-        /* Starry Background */
+        /* 星空の背景 */
         .stars {
             position: absolute;
             top: 0;
@@ -47,6 +49,7 @@
             100% { transform: scale(1); }
         }
 
+        /* スターウォーズ風クロールテキスト */
         .perspective-container {
             position: absolute;
             width: 100%;
@@ -79,12 +82,8 @@
             line-height: 1.2;
         }
         @media (min-width: 768px) {
-            .crawl-content {
-                font-size: 42px;
-            }
-            .crawl-episode-title {
-                font-size: 48px;
-            }
+            .crawl-content { font-size: 42px; }
+            .crawl-episode-title { font-size: 48px; }
         }
         @keyframes crawl {
             from { top: 100%; }
@@ -94,7 +93,6 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            /* width: 100%; この行を削除することで中央揃えが正しく機能します */
             color: #feda4a;
             font-weight: bold;
             text-align: center;
@@ -127,9 +125,7 @@
             animation: initialFade 5s forwards;
         }
         @media (min-width: 768px) {
-            .initial-text {
-                font-size: 3em;
-            }
+            .initial-text { font-size: 3em; }
         }
         @keyframes initialFade {
             0% { opacity: 0; }
@@ -138,32 +134,59 @@
             100% { opacity: 0; }
         }
 
-        /* --- Game Styles --- */
+        /* --- ゲーム画面のスタイル --- */
         .game-body {
             font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #333; /* 背景色を少し暗くしてキャンバスを目立たせる */
+        }
+        
+        /* ゲームコンテナをFlexboxで画面いっぱいに広げる */
+        #mainGame {
+            display: flex;
+            flex-direction: column;
+            height: 100vh; /* ビューポートの高さ100% */
+            width: 100vw;
             background-color: #f0f0f0;
         }
+
+        /* キャンバスコンテナは残りのスペースを全て使う */
+        #game-container {
+            flex-grow: 1; /* 残りのスペースを埋める */
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background-color: #333;
+        }
+
         canvas {
-            background-color: #f0f0f0;
             display: block;
-            border: 2px solid #333;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background-color: #f0f0f0;
+            /* JavaScriptでサイズを制御するため、width/heightは指定しない */
             image-rendering: -moz-crisp-edges;
             image-rendering: -webkit-crisp-edges;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
-            width: 100%;
-            height: auto;
+        }
+
+        /* 操作ボタンのスタイル */
+        #controls {
+            flex-shrink: 0; /* コントローラーは縮まない */
+            padding: 1rem;
+            background-color: #e2e8f0;
         }
         .control-btn {
             transition: all 0.1s ease-in-out;
-            user-select: none;
+            user-select: none; /* ボタンのテキスト選択を無効化 */
+            -webkit-user-select: none; /* iOS Safari用 */
         }
         .control-btn:active {
             transform: scale(0.9);
             background-color: #4a5568;
         }
+        
+        /* ダイアログボックスのスタイル */
         .dialogue-box {
             animation: slide-up 0.5s ease-out forwards;
         }
@@ -180,7 +203,6 @@
             <div class="stars stars-small"></div>
             <div class="stars stars-medium"></div>
         </div>
-
         <div id="initialText" class="initial-text">
             <p>遠い昔　　はるかかなたの</p>
             <p>銀河系で・・・</p>
@@ -192,43 +214,32 @@
             <div id="crawlContainer" class="crawl-container">
                 <div class="crawl-content">
                     <h3 class="crawl-episode-title">エピソード４<br>新たなる覚醒</h3>
-                    <p>もし、あなたの信じる日常が、偽りだとしたら？</p>
-                    <p>&nbsp;</p> 
-                    <p>それは、食べてもなくならないドッグフードから始まった。</p>
-                    <p>小さな違和感は、やがて世界の真実へと繋がる。</p>
-                    <p>一匹のチワワが、世界の運命をその鼻先に委ねられる。</p>
-                    <p>&nbsp;</p> 
-                    <p>白いチワワの男の子「ロセツ」。彼の日常は、温かい家族と優しい時間で満たされているはずだった。</p>
-                    <p>&nbsp;</p> 
-                    <p>しかし、その生まれつき鋭すぎる嗅覚と聴覚は、人間には決して気づけない世界の“ノイズ”を拾ってしまう。</p>
-                    <p>木の中から聞こえるはずのない電子音、昨日まで存在しなかった公園のブランコ、そして、何度食べても満たされることのない不思議なドッグフード。</p>
-                    <p>&nbsp;</p> 
-                    <p>それらはすべて、この世界が精巧なシミュレーションであり、今まさに崩壊の危機にあることを示す「バグ」だった。</p>
-                    <p>&nbsp;</p> 
-                    <p>このまま綻びが広がれば、大好きな家族の笑顔も、共に過ごした温かい記憶も、すべてがエラーコードの彼方に消えてしまうかもしれない。</p>
-                    <p>&nbsp;</p> 
-                    <p>ロセツは小さな胸に決意を秘める。</p>
-                    <p>鯨岡家の平和な日常を守るため、この世界の真実を突き止め、すべての「綻び」を修復する冒険に出ることを。</p>
+                    <p>もし、あなたの信じる日常が、偽りだとしたら？</p><p>&nbsp;</p> 
+                    <p>それは、食べてもなくならないドッグフードから始まった。</p><p>小さな違和感は、やがて世界の真実へと繋がる。</p><p>一匹のチワワが、世界の運命をその鼻先に委ねられる。</p><p>&nbsp;</p> 
+                    <p>白いチワワの男の子「ロセツ」。彼の日常は、温かい家族と優しい時間で満たされているはずだった。</p><p>&nbsp;</p> 
+                    <p>しかし、その生まれつき鋭すぎる嗅覚と聴覚は、人間には決して気づけない世界の“ノイズ”を拾ってしまう。</p><p>木の中から聞こえるはずのない電子音、昨日まで存在しなかった公園のブランコ、そして、何度食べても満たされることのない不思議なドッグフード。</p><p>&nbsp;</p> 
+                    <p>それらはすべて、この世界が精巧なシミュレーションであり、今まさに崩壊の危機にあることを示す「バグ」だった。</p><p>&nbsp;</p> 
+                    <p>このまま綻びが広がれば、大好きな家族の笑顔も、共に過ごした温かい記憶も、すべてがエラーコードの彼方に消えてしまうかもしれない。</p><p>&nbsp;</p> 
+                    <p>ロセツは小さな胸に決意を秘める。</p><p>鯨岡家の平和な日常を守るため、この世界の真実を突き止め、すべての「綻び」を修復する冒険に出ることを。</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Main Game (Initially Hidden) -->
-    <div id="mainGame" style="display: none;" class="flex flex-col items-center justify-center min-h-screen p-4">
-        <div id="game-container" class="w-full max-w-2xl mx-auto">
-            <h1 class="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-4">Rosetsu and the Simulated World</h1>
+    <div id="mainGame" style="display: none;">
+        <div id="game-container">
             <canvas id="gameCanvas"></canvas>
         </div>
-        <div id="dialogue-container" class="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-10"></div>
-        <div id="controls" class="mt-4 grid grid-cols-3 gap-2 w-full max-w-xs">
+        <div id="dialogue-container" class="fixed bottom-24 sm:bottom-28 left-0 right-0 p-4 flex justify-center z-10 pointer-events-none"></div>
+        <div id="controls" class="grid grid-cols-3 gap-2 w-full max-w-sm mx-auto">
             <div></div>
-            <button id="btn-up" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↑</button>
+            <button id="btn-up" class="control-btn bg-gray-500 text-white p-4 rounded-lg shadow-md">↑</button>
             <div></div>
-            <button id="btn-left" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">←</button>
-            <button id="btn-down" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↓</button>
-            <button id="btn-right" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">→</button>
-            <button id="btn-action" class="control-btn bg-lime-400 text-white p-4 rounded-lg shadow-md col-span-3">TALK / CHECK</button>
+            <button id="btn-left" class="control-btn bg-gray-500 text-white p-4 rounded-lg shadow-md">←</button>
+            <button id="btn-down" class="control-btn bg-gray-500 text-white p-4 rounded-lg shadow-md">↓</button>
+            <button id="btn-right" class="control-btn bg-gray-500 text-white p-4 rounded-lg shadow-md">→</button>
+            <button id="btn-action" class="control-btn bg-lime-500 text-white p-4 rounded-lg shadow-md col-span-3 mt-2">TALK / CHECK</button>
         </div>
     </div>
 
@@ -244,12 +255,13 @@
             const crawlContainer = document.getElementById('crawlContainer');
             const mainGame = document.getElementById('mainGame');
             const starsContainer = document.getElementById('starsContainer');
+            const gameContainer = document.getElementById('game-container');
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
 
             // --- Game Constants & State ---
-            const TILE_SIZE = 40;
-            let map = [
+            let TILE_SIZE = 40; // 動的に変更するためletに変更
+            const map = [
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
                 [1, 0, 3, 0, 0, 1, 0, 5, 0, 1, 0, 0, 3, 0, 1],
@@ -262,17 +274,14 @@
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             ];
             
-            const MAP_WIDTH = map[0].length * TILE_SIZE;
-            const MAP_HEIGHT = map.length * TILE_SIZE;
-
-            canvas.width = MAP_WIDTH;
-            canvas.height = MAP_HEIGHT;
+            const MAP_COLS = map[0].length;
+            const MAP_ROWS = map.length;
 
             const player = {
-                x: TILE_SIZE * 1.5,
-                y: TILE_SIZE * 8,
-                size: TILE_SIZE * 0.9,
-                speed: 4,
+                x: 0, // 初期化はresizeCanvasで行う
+                y: 0,
+                size: 0,
+                speed: 0,
                 isMoving: false,
                 frame: 0
             };
@@ -281,7 +290,7 @@
             const glitches = [];
             map.forEach((row, y) => {
                 row.forEach((tile, x) => {
-                    const pos = { x: x * TILE_SIZE, y: y * TILE_SIZE };
+                    const pos = { tileX: x, tileY: y };
                     if (tile === 5) { // Komaru
                         npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！" });
                     } else if (tile === 6) { // Tetsuji
@@ -297,171 +306,139 @@
             let tetsujiQuestAccepted = false;
             let openingSkipped = false;
             let dialogueTimeout;
+            let animationFrameId;
+
+            // --- Canvas Resize Function ---
+            function resizeCanvas() {
+                const containerWidth = gameContainer.clientWidth;
+                const containerHeight = gameContainer.clientHeight;
+                const mapAspectRatio = MAP_COLS / MAP_ROWS;
+                const containerAspectRatio = containerWidth / containerHeight;
+
+                let newCanvasWidth, newCanvasHeight;
+
+                if (containerAspectRatio > mapAspectRatio) {
+                    // コンテナがマップより横長の場合、高さに合わせる
+                    newCanvasHeight = containerHeight;
+                    newCanvasWidth = newCanvasHeight * mapAspectRatio;
+                } else {
+                    // コンテナがマップより縦長の場合、幅に合わせる
+                    newCanvasWidth = containerWidth;
+                    newCanvasHeight = newCanvasWidth / mapAspectRatio;
+                }
+
+                canvas.width = newCanvasWidth;
+                canvas.height = newCanvasHeight;
+                
+                // 新しいTILE_SIZEを計算
+                TILE_SIZE = canvas.width / MAP_COLS;
+
+                // TILE_SIZEの変更に伴い、プレイヤーのプロパティを再計算
+                if (!gameStarted) { // 初回のみ位置を初期化
+                    player.x = TILE_SIZE * 1.5;
+                    player.y = TILE_SIZE * 8;
+                }
+                player.size = TILE_SIZE * 0.9;
+                player.speed = TILE_SIZE / 10; // 速度も画面サイズに比例させる
+            }
 
             // --- Drawing Functions ---
             function drawRosetsu(p) {
+                const x = p.x + p.size / 2;
+                const y = p.y + p.size / 2;
                 ctx.save();
-                ctx.translate(p.x + p.size / 2, p.y + p.size / 2);
+                ctx.translate(x, y);
                 if (p.isMoving) {
-                    ctx.translate(0, Math.sin(Date.now() / 100) * 2);
+                    ctx.translate(0, Math.sin(Date.now() / 100) * (p.size * 0.05));
                 }
                 ctx.fillStyle = 'white';
                 ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = Math.max(1, TILE_SIZE * 0.05);
+
+                // Body
                 ctx.beginPath();
                 ctx.ellipse(0, p.size * 0.1, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
+                ctx.fill(); ctx.stroke();
+                // Head
                 ctx.beginPath();
                 ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
+                ctx.fill(); ctx.stroke();
+                // Ears
                 ctx.beginPath();
                 ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
                 ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.5, -p.size * 0.3, -p.size * 0.15);
-                ctx.fill();
-                ctx.stroke();
+                ctx.fill(); ctx.stroke();
                 ctx.beginPath();
                 ctx.moveTo(p.size * 0.2, -p.size * 0.3);
                 ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.5, p.size * 0.3, -p.size * 0.15);
-                ctx.fill();
-                ctx.stroke();
+                ctx.fill(); ctx.stroke();
+                // Face
                 ctx.fillStyle = 'black';
+                const eyeSize = Math.max(1, TILE_SIZE * 0.04);
                 ctx.beginPath();
-                ctx.arc(-p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2);
-                ctx.arc(p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2);
-                ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2);
+                ctx.arc(-p.size * 0.1, -p.size * 0.2, eyeSize, 0, Math.PI * 2);
+                ctx.arc(p.size * 0.1, -p.size * 0.2, eyeSize, 0, Math.PI * 2);
+                ctx.arc(0, -p.size * 0.15, eyeSize, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = '#FF9800';
-                ctx.beginPath();
-                ctx.ellipse(0, p.size * 0.15, p.size*0.05, p.size*0.12, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#FF7043';
-                ctx.beginPath();
-                ctx.moveTo(0, p.size * 0.05);
-                ctx.lineTo(-p.size*0.08, p.size*0.02);
-                ctx.lineTo(p.size*0.08, p.size*0.02);
-                ctx.closePath();
-                ctx.fill();
+                
                 ctx.restore();
             }
 
-            function drawKomaru(npc) {
+            function drawNPC(npc, drawFunc) {
+                const npcScreenX = npc.tileX * TILE_SIZE;
+                const npcScreenY = npc.tileY * TILE_SIZE;
+                drawFunc(npcScreenX, npcScreenY);
+            }
+
+            function drawKomaru(x, y) {
                 ctx.save();
-                ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
+                ctx.translate(x + TILE_SIZE / 2, y + TILE_SIZE / 2);
                 const p = { size: TILE_SIZE * 0.9 };
-                ctx.fillStyle = 'white';
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.ellipse(0, p.size * 0.15, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
-                ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.45, -p.size * 0.35, -p.size * 0.15);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(p.size * 0.2, -p.size * 0.3);
-                ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.45, p.size * 0.35, -p.size * 0.15);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = 'black';
-                ctx.beginPath();
-                ctx.arc(-p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2);
-                ctx.arc(p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2);
-                ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(-p.size*0.1, -p.size*0.1);
-                ctx.quadraticCurveTo(0, -p.size*0.07, p.size*0.1, -p.size*0.1);
-                ctx.stroke();
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.22, -p.size * 0.4);
-                ctx.lineTo(-p.size * 0.1, -p.size * 0.3);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(p.size * 0.22, -p.size * 0.4);
-                ctx.lineTo(p.size * 0.1, -p.size * 0.3);
-                ctx.stroke();
+                ctx.fillStyle = 'white'; ctx.strokeStyle = 'black'; ctx.lineWidth = Math.max(1, TILE_SIZE * 0.05);
+                ctx.beginPath(); ctx.ellipse(0, p.size * 0.15, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-p.size * 0.2, -p.size * 0.3); ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.45, -p.size * 0.35, -p.size * 0.15); ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(p.size * 0.2, -p.size * 0.3); ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.45, p.size * 0.35, -p.size * 0.15); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = 'black'; const eyeSize = Math.max(1, TILE_SIZE * 0.04);
+                ctx.beginPath(); ctx.arc(-p.size * 0.12, -p.size * 0.2, eyeSize, 0, Math.PI * 2); ctx.arc(p.size * 0.12, -p.size * 0.2, eyeSize, 0, Math.PI * 2); ctx.arc(0, -p.size * 0.15, eyeSize, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = 'black'; ctx.lineWidth = Math.max(1, TILE_SIZE * 0.04);
+                ctx.beginPath(); ctx.moveTo(-p.size*0.1, -p.size*0.1); ctx.quadraticCurveTo(0, -p.size*0.07, p.size*0.1, -p.size*0.1); ctx.stroke();
+                ctx.lineWidth = Math.max(1, TILE_SIZE * 0.05);
+                ctx.beginPath(); ctx.moveTo(-p.size * 0.22, -p.size * 0.4); ctx.lineTo(-p.size * 0.1, -p.size * 0.3); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(p.size * 0.22, -p.size * 0.4); ctx.lineTo(p.size * 0.1, -p.size * 0.3); ctx.stroke();
                 ctx.restore();
             }
             
-            function drawTetsuji(npc) {
+            function drawTetsuji(x, y) {
                 ctx.save();
-                ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
+                ctx.translate(x + TILE_SIZE / 2, y + TILE_SIZE / 2);
                 const p = { size: TILE_SIZE };
-                ctx.fillStyle = '#f5deb3';
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.ellipse(0, p.size * 0.25, p.size * 0.5, p.size * 0.3, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(0, -p.size * 0.1, p.size * 0.4, p.size * 0.28, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(-p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = '#3d3532';
-                ctx.beginPath();
-                ctx.ellipse(0, 0, p.size * 0.25, p.size * 0.1, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = 'black';
-                ctx.beginPath();
-                ctx.arc(-p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2);
-                ctx.arc( p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2);
-                ctx.arc( 0, p.size * 0.02, p.size * 0.04, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(-p.size * 0.13, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
-                ctx.arc( p.size * 0.17, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.08, p.size * 0.08);
-                ctx.quadraticCurveTo(0, p.size * 0.12, p.size * 0.08, p.size * 0.08);
-                ctx.stroke();
-                ctx.strokeStyle = '#3d3532';
-                ctx.lineWidth = 4;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.2, -p.size * 0.22);
-                ctx.quadraticCurveTo(-p.size * 0.12, -p.size * 0.3, -p.size * 0.04, -p.size * 0.22);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(p.size * 0.2, -p.size * 0.22);
-                ctx.quadraticCurveTo(p.size * 0.12, -p.size * 0.3, p.size * 0.04, -p.size * 0.22);
-                ctx.stroke();
+                ctx.fillStyle = '#f5deb3'; ctx.strokeStyle = 'black'; ctx.lineWidth = Math.max(1, TILE_SIZE * 0.05);
+                ctx.beginPath(); ctx.ellipse(0, p.size * 0.25, p.size * 0.5, p.size * 0.3, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.ellipse(0, -p.size * 0.1, p.size * 0.4, p.size * 0.28, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.ellipse(-p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.ellipse(p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#3d3532'; ctx.beginPath(); ctx.ellipse(0, 0, p.size * 0.25, p.size * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'black'; const eyeSize = Math.max(1, p.size * 0.05);
+                ctx.beginPath(); ctx.arc(-p.size * 0.15, -p.size * 0.12, eyeSize, 0, Math.PI * 2); ctx.arc( p.size * 0.15, -p.size * 0.12, eyeSize, 0, Math.PI * 2); ctx.arc( 0, p.size * 0.02, p.size * 0.04, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'white'; const highlightSize = Math.max(0.5, p.size * 0.015);
+                ctx.beginPath(); ctx.arc(-p.size * 0.13, -p.size * 0.14, highlightSize, 0, Math.PI * 2); ctx.arc( p.size * 0.17, -p.size * 0.14, highlightSize, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = 'white'; ctx.lineWidth = Math.max(1, p.size * 0.04); ctx.beginPath(); ctx.moveTo(-p.size * 0.08, p.size * 0.08); ctx.quadraticCurveTo(0, p.size * 0.12, p.size * 0.08, p.size * 0.08); ctx.stroke();
+                ctx.strokeStyle = '#3d3532'; ctx.lineWidth = Math.max(1, p.size * 0.1); ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(-p.size * 0.2, -p.size * 0.22); ctx.quadraticCurveTo(-p.size * 0.12, -p.size * 0.3, -p.size * 0.04, -p.size * 0.22); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(p.size * 0.2, -p.size * 0.22); ctx.quadraticCurveTo(p.size * 0.12, -p.size * 0.3, p.size * 0.04, -p.size * 0.22); ctx.stroke();
                 ctx.restore();
             }
 
             function drawMap() {
-                for (let y = 0; y < map.length; y++) {
-                    for (let x = 0; x < map[y].length; x++) {
+                for (let y = 0; y < MAP_ROWS; y++) {
+                    for (let x = 0; x < MAP_COLS; x++) {
                         let color;
                         switch(map[y][x]) {
-                            case 1: color = '#7a6855'; break;
-                            case 3: color = '#8aab79'; break; 
-                            case 4: color = '#6b8e23'; break;
-                            default: color = '#a3bf8f';
+                            case 1: color = '#7a6855'; break; // Wall
+                            case 3: color = '#8aab79'; break; // Bush
+                            case 4: color = '#6b8e23'; break; // Tree
+                            default: color = '#a3bf8f'; // Floor
                         }
                         ctx.fillStyle = color;
                         ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -471,8 +448,8 @@
 
             function drawNPCs() {
                 npcs.forEach(npc => {
-                    if (npc.type === 5) drawKomaru(npc);
-                    if (npc.type === 6) drawTetsuji(npc);
+                    if (npc.type === 5) drawNPC(npc, drawKomaru);
+                    if (npc.type === 6) drawNPC(npc, drawTetsuji);
                 });
             }
 
@@ -480,6 +457,9 @@
                 const colors = ['#ff00ff', '#ff99ff', '#ffffff', '#ff99ff'];
                 glitches.forEach(g => {
                     if (!g.fixed) {
+                        const gX = g.tileX * TILE_SIZE;
+                        const gY = g.tileY * TILE_SIZE;
+
                         g.flicker = (g.flicker + 1) % 40;
                         ctx.globalAlpha = 0.7 + Math.sin(Date.now() / 200) * 0.3;
                         if (g.id === 'ball') {
@@ -488,7 +468,7 @@
                             ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2);
                             ctx.fill();
                             ctx.strokeStyle = colors[Math.floor(g.flicker / 10)];
-                            ctx.lineWidth = 3;
+                            ctx.lineWidth = Math.max(1, TILE_SIZE * 0.075);
                             ctx.beginPath();
                             ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/4, Math.PI*0.2, Math.PI*0.8);
                             ctx.stroke();
@@ -497,7 +477,7 @@
                             ctx.stroke();
                         } else {
                             ctx.fillStyle = colors[Math.floor(g.flicker / 10)];
-                            ctx.fillRect(g.x, g.y, g.size, g.size);
+                            ctx.fillRect(gX, gY, TILE_SIZE, TILE_SIZE);
                         }
                         ctx.globalAlpha = 1.0;
                     }
@@ -520,20 +500,20 @@
                 glitches.forEach(g => {
                     if (g.id === 'ball' && !g.fixed && tetsujiQuestAccepted) {
                         if (g.vx === 0 && g.vy === 0) {
-                            g.vx = (Math.random() - 0.5) * 5 + 1;
-                            g.vy = (Math.random() - 0.5) * 5 + 1;
+                            // 初めて動かすときに位置をピクセル座標に変換
+                            g.x = g.tileX * TILE_SIZE;
+                            g.y = g.tileY * TILE_SIZE;
+                            g.vx = (Math.random() - 0.5) * (TILE_SIZE * 0.15);
+                            g.vy = (Math.random() - 0.5) * (TILE_SIZE * 0.15);
                         }
                         g.x += g.vx;
                         g.y += g.vy;
                         const playableAreaMargin = TILE_SIZE;
-                        if (g.x < playableAreaMargin || g.x + g.size > MAP_WIDTH - playableAreaMargin) {
-                            g.vx *= -1;
-                        }
-                        if (g.y < playableAreaMargin || g.y + g.size > MAP_HEIGHT - playableAreaMargin) {
-                            g.vy *= -1;
-                        }
+                        if (g.x < playableAreaMargin || g.x + TILE_SIZE > canvas.width - playableAreaMargin) g.vx *= -1;
+                        if (g.y < playableAreaMargin || g.y + TILE_SIZE > canvas.height - playableAreaMargin) g.vy *= -1;
+                        
                         const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
-                        if (dist < player.size / 2 + (g.size / 3)) {
+                        if (dist < player.size / 2 + (TILE_SIZE / 3)) {
                             g.fixed = true;
                             handleGlitchFix('ball');
                         }
@@ -549,7 +529,7 @@
             }
 
             function isWall(x, y) {
-                const margin = 2;
+                const margin = player.size * 0.1;
                 const corners = [
                     {x: x + margin, y: y + margin},
                     {x: x + player.size - margin, y: y + margin},
@@ -568,8 +548,11 @@
 
             function interact() {
                 let interacted = false;
+                // NPCとのインタラクション
                 npcs.forEach(npc => {
-                    const dist = Math.hypot((player.x + player.size/2) - (npc.x + TILE_SIZE/2), (player.y + player.size/2) - (npc.y + TILE_SIZE/2));
+                    const npcScreenX = npc.tileX * TILE_SIZE;
+                    const npcScreenY = npc.tileY * TILE_SIZE;
+                    const dist = Math.hypot((player.x + player.size/2) - (npcScreenX + TILE_SIZE/2), (player.y + player.size/2) - (npcScreenY + TILE_SIZE/2));
                     if (dist < TILE_SIZE * 1.2) {
                         if (npc.id === 'tetsuji' && !tetsujiQuestAccepted) {
                             tetsujiQuestAccepted = true;
@@ -585,9 +568,12 @@
                 });
                 if (interacted) return;
 
+                // バグとのインタラクション
                 glitches.forEach(g => {
                     if (g.id === 'normal' && !g.fixed) {
-                        const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
+                        const gScreenX = g.tileX * TILE_SIZE;
+                        const gScreenY = g.tileY * TILE_SIZE;
+                        const dist = Math.hypot((player.x + player.size/2) - (gScreenX + TILE_SIZE/2), (player.y + player.size/2) - (gScreenY + TILE_SIZE/2));
                         if (dist < TILE_SIZE) {
                             g.fixed = true;
                             interacted = true;
@@ -615,6 +601,10 @@
             function checkWinCondition() {
                 if (glitches.every(g => g.fixed)) {
                     showDialogue("やった！全部のバグを直したぞ！これでみんな安心だ！", 5000, "ロセツ", true);
+                    // ゲームクリア後、ループを停止
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                    }
                 }
             }
             
@@ -626,18 +616,14 @@
                 if(speaker === 'komaru') speakerColor = "text-green-600";
                 if(speaker === 'tetsuji') speakerColor = "text-yellow-700";
                 
-                const speakerName = {
-                    'komaru': 'コマル先輩',
-                    'tetsuji': '鉄二',
-                    'ロセツ': 'ロセツ'
-                }[speaker] || 'ロセツ';
+                const speakerName = { 'komaru': 'コマル先輩', 'tetsuji': '鉄二', 'ロセツ': 'ロセツ' }[speaker] || speaker;
 
                 const dialogueBox = `
-                    <div class="dialogue-box bg-white bg-opacity-90 p-4 rounded-lg shadow-xl border-2 border-gray-300 max-w-md w-full">
-                        <p class="text-gray-800 font-bold">
+                    <div class="dialogue-box bg-white bg-opacity-90 p-3 sm:p-4 rounded-lg shadow-xl border-2 border-gray-300 max-w-md w-11/12">
+                        <p class="text-gray-800 font-bold text-sm sm:text-base">
                             <span class="${speakerColor}">${speakerName}:</span> ${text}
                         </p>
-                        ${isEnd ? '<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>' : ''}
+                        ${isEnd ? '<p class="text-center text-xs sm:text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>' : ''}
                     </div>
                 `;
                 container.innerHTML = dialogueBox;
@@ -657,20 +643,19 @@
                     drawNPCs();
                     drawGlitches();
                     drawRosetsu(player);
-                    requestAnimationFrame(gameLoop);
+                    animationFrameId = requestAnimationFrame(gameLoop);
                 }
 
-                function handleTouchStart(e) {
+                function handleInteractionStart() {
                     if (!gameStarted) {
                         gameStarted = true;
                         showDialogue("お外の様子が変だ…パトロールしなきゃ！", 4000);
                     }
                 }
-                canvas.addEventListener('touchstart', handleTouchStart, { once: true });
 
                 const setupBtn = (id, dir) => {
                     const btn = document.getElementById(id);
-                    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = true; if (!gameStarted) gameStarted = true; });
+                    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = true; handleInteractionStart(); });
                     btn.addEventListener('pointerup', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
                     btn.addEventListener('pointerleave', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
                 };
@@ -678,9 +663,10 @@
                 setupBtn('btn-down', 'Down');
                 setupBtn('btn-left', 'Left');
                 setupBtn('btn-right', 'Right');
-                document.getElementById('btn-action').addEventListener('click', (e) => { e.preventDefault(); if (!gameStarted) gameStarted = true; interact(); });
+                document.getElementById('btn-action').addEventListener('click', (e) => { e.preventDefault(); handleInteractionStart(); interact(); });
                 
-                showDialogue("ゲーム画面をタップしてスタート！", 5000, "システム");
+                showDialogue("ボタンを押してゲームスタート！", 5000, "システム");
+                resizeCanvas(); // 初回描画のためにサイズ設定
                 gameLoop();
             }
 
@@ -689,10 +675,15 @@
                 if (openingSkipped) return;
                 openingSkipped = true;
 
-                openingSequence.style.display = 'none';
-                document.body.classList.add('game-body');
-                mainGame.style.display = 'flex';
-                startGame();
+                openingSequence.style.transition = 'opacity 0.5s';
+                openingSequence.style.opacity = '0';
+                
+                setTimeout(() => {
+                    openingSequence.style.display = 'none';
+                    document.body.classList.add('game-body');
+                    mainGame.style.display = 'flex';
+                    startGame();
+                }, 500);
             }
 
             openingSequence.addEventListener('click', skipOpening);
@@ -714,6 +705,12 @@
             crawlContainer.addEventListener('animationend', () => {
                  if (openingSkipped) return;
                  skipOpening();
+            });
+
+            // ウィンドウリサイズ時にキャンバスサイズを調整
+            window.addEventListener('resize', () => {
+                if (!openingSkipped) return; // ゲームが始まってからリサイズ
+                resizeCanvas();
             });
         });
     </script>
