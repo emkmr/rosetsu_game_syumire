@@ -1,721 +1,1432 @@
 <!DOCTYPE html>
+
 <html lang="ja">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Rosetsu and the Simulated World</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Noto Sans JP', sans-serif;
-            background-color: #000;
-            overflow: hidden;
-            margin: 0;
-        }
-        
-        /* --- Opening Styles --- */
-        #openingSequence {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-        }
 
-        /* Starry Background */
-        .stars {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: transparent;
-        }
-        .stars-small {
-            background-image: radial-gradient(1px 1px at 20px 30px, #eee, rgba(0,0,0,0)), radial-gradient(1px 1px at 40px 70px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 50px 160px, #ddd, rgba(0,0,0,0)), radial-gradient(1px 1px at 90px 40px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 130px 80px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 160px 120px, #ddd, rgba(0,0,0,0));
-            background-size: 200px 200px;
-            animation: zoom 25s infinite;
-        }
-        .stars-medium {
-            background-image: radial-gradient(2px 2px at 50px 50px, #fff, rgba(0,0,0,0)), radial-gradient(2px 2px at 100px 100px, #ddd, rgba(0,0,0,0)), radial-gradient(2px 2px at 200px 150px, #fff, rgba(0,0,0,0));
-            background-size: 300px 300px;
-            animation: zoom 40s infinite;
-        }
-        @keyframes zoom {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
+<meta charset="UTF-8">
 
-        .perspective-container {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            perspective: 400px;
-            perspective-origin: 50% 60%;
-        }
-        .crawl-container {
-            position: absolute;
-            top: 100%;
-            width: 80%;
-            max-width: 800px;
-            left: 50%;
-            transform: translateX(-50%);
-            transform-origin: 50% 100%;
-            animation: crawl 50s linear forwards;
-        }
-        .crawl-content {
-            color: #feda4a;
-            font-size: 5.5vw;
-            line-height: 1.4;
-            text-align: justify;
-            font-weight: bold;
-            transform: rotateX(20deg);
-        }
-        .crawl-episode-title {
-            text-align: center;
-            font-size: 6vw;
-            margin-bottom: 2em;
-            line-height: 1.2;
-        }
-        @media (min-width: 768px) {
-            .crawl-content {
-                font-size: 42px;
-            }
-            .crawl-episode-title {
-                font-size: 48px;
-            }
-        }
-        @keyframes crawl {
-            from { top: 100%; }
-            to { top: -200%; }
-        }
-        .game-title-opening {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            /* width: 100%; この行を削除することで中央揃えが正しく機能します */
-            color: #feda4a;
-            font-weight: bold;
-            text-align: center;
-            opacity: 0;
-            transform: translate(-50%, -50%) scale(1.5);
-            animation: titleZoom 7s forwards;
-        }
-        .main-title {
-            font-size: 10vw;
-            white-space: nowrap;
-        }
-        @media (min-width: 768px) {
-            .main-title { font-size: 72px; }
-        }
-        @keyframes titleZoom {
-            0% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
-            80% { opacity: 1; }
-            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
-        }
-        .initial-text {
-            position: absolute;
-            top: 50%;
-            left: 5%;
-            transform: translateY(-50%);
-            color: #49dafd;
-            font-size: 7vw;
-            font-weight: bold;
-            text-align: left;
-            opacity: 0;
-            animation: initialFade 5s forwards;
-        }
-        @media (min-width: 768px) {
-            .initial-text {
-                font-size: 3em;
-            }
-        }
-        @keyframes initialFade {
-            0% { opacity: 0; }
-            20% { opacity: 1; }
-            80% { opacity: 1; }
-            100% { opacity: 0; }
-        }
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
-        /* --- Game Styles --- */
-        .game-body {
-            font-family: 'M PLUS Rounded 1c', sans-serif;
-            background-color: #f0f0f0;
-        }
-        canvas {
-            background-color: #f0f0f0;
-            display: block;
-            border: 2px solid #333;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            image-rendering: -moz-crisp-edges;
-            image-rendering: -webkit-crisp-edges;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-            width: 100%;
-            height: auto;
-        }
-        .control-btn {
-            transition: all 0.1s ease-in-out;
-            user-select: none;
-        }
-        .control-btn:active {
-            transform: scale(0.9);
-            background-color: #4a5568;
-        }
-        .dialogue-box {
-            animation: slide-up 0.5s ease-out forwards;
-        }
-        @keyframes slide-up {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-    </style>
+<title>Rosetsu and the Simulated World</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+
+body {
+
+font-family: 'Noto Sans JP', sans-serif;
+
+background-color: #000;
+
+overflow: hidden;
+
+margin: 0;
+
+}
+
+
+/* --- Opening Styles --- */
+
+#openingSequence {
+
+position: relative;
+
+width: 100vw;
+
+height: 100vh;
+
+overflow: hidden;
+
+}
+
+
+
+/* Starry Background */
+
+.stars {
+
+position: absolute;
+
+top: 0;
+
+left: 0;
+
+width: 100%;
+
+height: 100%;
+
+background: transparent;
+
+}
+
+.stars-small {
+
+background-image: radial-gradient(1px 1px at 20px 30px, #eee, rgba(0,0,0,0)), radial-gradient(1px 1px at 40px 70px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 50px 160px, #ddd, rgba(0,0,0,0)), radial-gradient(1px 1px at 90px 40px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 130px 80px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 160px 120px, #ddd, rgba(0,0,0,0));
+
+background-size: 200px 200px;
+
+animation: zoom 25s infinite;
+
+}
+
+.stars-medium {
+
+background-image: radial-gradient(2px 2px at 50px 50px, #fff, rgba(0,0,0,0)), radial-gradient(2px 2px at 100px 100px, #ddd, rgba(0,0,0,0)), radial-gradient(2px 2px at 200px 150px, #fff, rgba(0,0,0,0));
+
+background-size: 300px 300px;
+
+animation: zoom 40s infinite;
+
+}
+
+@keyframes zoom {
+
+0% { transform: scale(1); }
+
+50% { transform: scale(1.2); }
+
+100% { transform: scale(1); }
+
+}
+
+
+
+.perspective-container {
+
+position: absolute;
+
+width: 100%;
+
+height: 100%;
+
+perspective: 400px;
+
+perspective-origin: 50% 60%;
+
+}
+
+.crawl-container {
+
+position: absolute;
+
+top: 100%;
+
+width: 80%;
+
+max-width: 800px;
+
+left: 50%;
+
+transform: translateX(-50%);
+
+transform-origin: 50% 100%;
+
+animation: crawl 50s linear forwards;
+
+}
+
+.crawl-content {
+
+color: #feda4a;
+
+font-size: 5.5vw;
+
+line-height: 1.4;
+
+text-align: justify;
+
+font-weight: bold;
+
+transform: rotateX(20deg);
+
+}
+
+.crawl-episode-title {
+
+text-align: center;
+
+font-size: 6vw;
+
+margin-bottom: 2em;
+
+line-height: 1.2;
+
+}
+
+@media (min-width: 768px) {
+
+.crawl-content {
+
+font-size: 42px;
+
+}
+
+.crawl-episode-title {
+
+font-size: 48px;
+
+}
+
+}
+
+@keyframes crawl {
+
+from { top: 100%; }
+
+to { top: -200%; }
+
+}
+
+.game-title-opening {
+
+position: absolute;
+
+top: 50%;
+
+left: 50%;
+
+/* width: 100%; この行を削除することで中央揃えが正しく機能します */
+
+color: #feda4a;
+
+font-weight: bold;
+
+text-align: center;
+
+opacity: 0;
+
+transform: translate(-50%, -50%) scale(1.5);
+
+animation: titleZoom 7s forwards;
+
+}
+
+.main-title {
+
+font-size: 10vw;
+
+white-space: nowrap;
+
+}
+
+@media (min-width: 768px) {
+
+.main-title { font-size: 72px; }
+
+}
+
+@keyframes titleZoom {
+
+0% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+
+80% { opacity: 1; }
+
+100% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+
+}
+
+.initial-text {
+
+position: absolute;
+
+top: 50%;
+
+left: 5%;
+
+transform: translateY(-50%);
+
+color: #49dafd;
+
+font-size: 7vw;
+
+font-weight: bold;
+
+text-align: left;
+
+opacity: 0;
+
+animation: initialFade 5s forwards;
+
+}
+
+@media (min-width: 768px) {
+
+.initial-text {
+
+font-size: 3em;
+
+}
+
+}
+
+@keyframes initialFade {
+
+0% { opacity: 0; }
+
+20% { opacity: 1; }
+
+80% { opacity: 1; }
+
+100% { opacity: 0; }
+
+}
+
+
+
+/* --- Game Styles --- */
+
+.game-body {
+
+font-family: 'M PLUS Rounded 1c', sans-serif;
+
+background-color: #f0f0f0;
+
+}
+
+canvas {
+
+background-color: #f0f0f0;
+
+display: block;
+
+border: 2px solid #333;
+
+border-radius: 8px;
+
+box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+
+image-rendering: -moz-crisp-edges;
+
+image-rendering: -webkit-crisp-edges;
+
+image-rendering: pixelated;
+
+image-rendering: crisp-edges;
+
+width: 100%;
+
+height: auto;
+
+}
+
+.control-btn {
+
+transition: all 0.1s ease-in-out;
+
+user-select: none;
+
+}
+
+.control-btn:active {
+
+transform: scale(0.9);
+
+background-color: #4a5568;
+
+}
+
+.dialogue-box {
+
+animation: slide-up 0.5s ease-out forwards;
+
+}
+
+@keyframes slide-up {
+
+from { transform: translateY(100%); opacity: 0; }
+
+to { transform: translateY(0); opacity: 1; }
+
+}
+
+</style>
+
 </head>
+
 <body>
-    <!-- Opening Sequence -->
-    <div id="openingSequence">
-        <div id="starsContainer" style="display: none;">
-            <div class="stars stars-small"></div>
-            <div class="stars stars-medium"></div>
-        </div>
 
-        <div id="initialText" class="initial-text">
-            <p>遠い昔　　はるかかなたの</p>
-            <p>銀河系で・・・</p>
-        </div>
-        <div id="gameTitleOpening" class="game-title-opening" style="display: none;">
-            <p class="main-title">Rosetsu and the Simulated World</p>
-        </div>
-        <div id="perspectiveContainer" class="perspective-container" style="display: none;">
-            <div id="crawlContainer" class="crawl-container">
-                <div class="crawl-content">
-                    <h3 class="crawl-episode-title">エピソード４<br>新たなる覚醒</h3>
-                    <p>もし、あなたの信じる日常が、偽りだとしたら？</p>
-                    <p>&nbsp;</p> 
-                    <p>それは、食べてもなくならないドッグフードから始まった。</p>
-                    <p>小さな違和感は、やがて世界の真実へと繋がる。</p>
-                    <p>一匹のチワワが、世界の運命をその鼻先に委ねられる。</p>
-                    <p>&nbsp;</p> 
-                    <p>白いチワワの男の子「ロセツ」。彼の日常は、温かい家族と優しい時間で満たされているはずだった。</p>
-                    <p>&nbsp;</p> 
-                    <p>しかし、その生まれつき鋭すぎる嗅覚と聴覚は、人間には決して気づけない世界の“ノイズ”を拾ってしまう。</p>
-                    <p>木の中から聞こえるはずのない電子音、昨日まで存在しなかった公園のブランコ、そして、何度食べても満たされることのない不思議なドッグフード。</p>
-                    <p>&nbsp;</p> 
-                    <p>それらはすべて、この世界が精巧なシミュレーションであり、今まさに崩壊の危機にあることを示す「バグ」だった。</p>
-                    <p>&nbsp;</p> 
-                    <p>このまま綻びが広がれば、大好きな家族の笑顔も、共に過ごした温かい記憶も、すべてがエラーコードの彼方に消えてしまうかもしれない。</p>
-                    <p>&nbsp;</p> 
-                    <p>ロセツは小さな胸に決意を秘める。</p>
-                    <p>鯨岡家の平和な日常を守るため、この世界の真実を突き止め、すべての「綻び」を修復する冒険に出ることを。</p>
-                </div>
-            </div>
-        </div>
-    </div>
+<!-- Opening Sequence -->
 
-    <!-- Main Game (Initially Hidden) -->
-    <div id="mainGame" style="display: none;" class="flex flex-col items-center justify-center min-h-screen p-4">
-        <div id="game-container" class="w-full max-w-2xl mx-auto">
-            <h1 class="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-4">Rosetsu and the Simulated World</h1>
-            <canvas id="gameCanvas"></canvas>
-        </div>
-        <div id="dialogue-container" class="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-10"></div>
-        <div id="controls" class="mt-4 grid grid-cols-3 gap-2 w-full max-w-xs">
-            <div></div>
-            <button id="btn-up" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↑</button>
-            <div></div>
-            <button id="btn-left" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">←</button>
-            <button id="btn-down" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↓</button>
-            <button id="btn-right" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">→</button>
-            <button id="btn-action" class="control-btn bg-lime-400 text-white p-4 rounded-lg shadow-md col-span-3">TALK / CHECK</button>
-        </div>
-    </div>
+<div id="openingSequence">
 
-    <script type="module">
-        // DOMの読み込みが完了してからスクリプト全体を実行
-        window.addEventListener('DOMContentLoaded', () => {
+<div id="starsContainer" style="display: none;">
 
-            // --- DOM Elements ---
-            const openingSequence = document.getElementById('openingSequence');
-            const initialText = document.getElementById('initialText');
-            const gameTitleOpening = document.getElementById('gameTitleOpening');
-            const perspectiveContainer = document.getElementById('perspectiveContainer');
-            const crawlContainer = document.getElementById('crawlContainer');
-            const mainGame = document.getElementById('mainGame');
-            const starsContainer = document.getElementById('starsContainer');
-            const canvas = document.getElementById('gameCanvas');
-            const ctx = canvas.getContext('2d');
+<div class="stars stars-small"></div>
 
-            // --- Game Constants & State ---
-            const TILE_SIZE = 40;
-            let map = [
-                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-                [1, 0, 3, 0, 0, 1, 0, 5, 0, 1, 0, 0, 3, 0, 1],
-                [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0, 0, 1],
-                [1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 1],
-                [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
-                [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8, 0, 1],
-                [1, 0, 3, 0, 0, 1, 0, 7, 0, 1, 0, 0, 3, 0, 1],
-                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            ];
-            
-            const MAP_WIDTH = map[0].length * TILE_SIZE;
-            const MAP_HEIGHT = map.length * TILE_SIZE;
+<div class="stars stars-medium"></div>
 
-            canvas.width = MAP_WIDTH;
-            canvas.height = MAP_HEIGHT;
+</div>
 
-            const player = {
-                x: TILE_SIZE * 1.5,
-                y: TILE_SIZE * 8,
-                size: TILE_SIZE * 0.9,
-                speed: 4,
-                isMoving: false,
-                frame: 0
-            };
 
-            const npcs = [];
-            const glitches = [];
-            map.forEach((row, y) => {
-                row.forEach((tile, x) => {
-                    const pos = { x: x * TILE_SIZE, y: y * TILE_SIZE };
-                    if (tile === 5) { // Komaru
-                        npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！" });
-                    } else if (tile === 6) { // Tetsuji
-                        npcs.push({ ...pos, id: 'tetsuji', type: 6, dialogue: "うぅ…首輪についてたももちゃんにもらった大事な野球ボールが、変な光と共になくなっちゃったんだ…" });
-                    } else if (tile === 7 || tile === 8) { // Glitches
-                        glitches.push({ ...pos, size: TILE_SIZE, id: tile === 7 ? 'normal' : 'ball', fixed: false, flicker: 0, vx: 0, vy: 0 });
-                    }
-                });
-            });
 
-            let keys = {};
-            let gameStarted = false;
-            let tetsujiQuestAccepted = false;
-            let openingSkipped = false;
-            let dialogueTimeout;
+<div id="initialText" class="initial-text">
 
-            // --- Drawing Functions ---
-            function drawRosetsu(p) {
-                ctx.save();
-                ctx.translate(p.x + p.size / 2, p.y + p.size / 2);
-                if (p.isMoving) {
-                    ctx.translate(0, Math.sin(Date.now() / 100) * 2);
-                }
-                ctx.fillStyle = 'white';
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.ellipse(0, p.size * 0.1, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
-                ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.5, -p.size * 0.3, -p.size * 0.15);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(p.size * 0.2, -p.size * 0.3);
-                ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.5, p.size * 0.3, -p.size * 0.15);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = 'black';
-                ctx.beginPath();
-                ctx.arc(-p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2);
-                ctx.arc(p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2);
-                ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#FF9800';
-                ctx.beginPath();
-                ctx.ellipse(0, p.size * 0.15, p.size*0.05, p.size*0.12, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#FF7043';
-                ctx.beginPath();
-                ctx.moveTo(0, p.size * 0.05);
-                ctx.lineTo(-p.size*0.08, p.size*0.02);
-                ctx.lineTo(p.size*0.08, p.size*0.02);
-                ctx.closePath();
-                ctx.fill();
-                ctx.restore();
-            }
+<p>遠い昔　　はるかかなたの</p>
 
-            function drawKomaru(npc) {
-                ctx.save();
-                ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
-                const p = { size: TILE_SIZE * 0.9 };
-                ctx.fillStyle = 'white';
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.ellipse(0, p.size * 0.15, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
-                ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.45, -p.size * 0.35, -p.size * 0.15);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(p.size * 0.2, -p.size * 0.3);
-                ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.45, p.size * 0.35, -p.size * 0.15);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = 'black';
-                ctx.beginPath();
-                ctx.arc(-p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2);
-                ctx.arc(p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2);
-                ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(-p.size*0.1, -p.size*0.1);
-                ctx.quadraticCurveTo(0, -p.size*0.07, p.size*0.1, -p.size*0.1);
-                ctx.stroke();
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.22, -p.size * 0.4);
-                ctx.lineTo(-p.size * 0.1, -p.size * 0.3);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(p.size * 0.22, -p.size * 0.4);
-                ctx.lineTo(p.size * 0.1, -p.size * 0.3);
-                ctx.stroke();
-                ctx.restore();
-            }
-            
-            function drawTetsuji(npc) {
-                ctx.save();
-                ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
-                const p = { size: TILE_SIZE };
-                ctx.fillStyle = '#f5deb3';
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.ellipse(0, p.size * 0.25, p.size * 0.5, p.size * 0.3, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(0, -p.size * 0.1, p.size * 0.4, p.size * 0.28, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(-p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.ellipse(p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-                ctx.fillStyle = '#3d3532';
-                ctx.beginPath();
-                ctx.ellipse(0, 0, p.size * 0.25, p.size * 0.1, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = 'black';
-                ctx.beginPath();
-                ctx.arc(-p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2);
-                ctx.arc( p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2);
-                ctx.arc( 0, p.size * 0.02, p.size * 0.04, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(-p.size * 0.13, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
-                ctx.arc( p.size * 0.17, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.08, p.size * 0.08);
-                ctx.quadraticCurveTo(0, p.size * 0.12, p.size * 0.08, p.size * 0.08);
-                ctx.stroke();
-                ctx.strokeStyle = '#3d3532';
-                ctx.lineWidth = 4;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(-p.size * 0.2, -p.size * 0.22);
-                ctx.quadraticCurveTo(-p.size * 0.12, -p.size * 0.3, -p.size * 0.04, -p.size * 0.22);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(p.size * 0.2, -p.size * 0.22);
-                ctx.quadraticCurveTo(p.size * 0.12, -p.size * 0.3, p.size * 0.04, -p.size * 0.22);
-                ctx.stroke();
-                ctx.restore();
-            }
+<p>銀河系で・・・</p>
 
-            function drawMap() {
-                for (let y = 0; y < map.length; y++) {
-                    for (let x = 0; x < map[y].length; x++) {
-                        let color;
-                        switch(map[y][x]) {
-                            case 1: color = '#7a6855'; break;
-                            case 3: color = '#8aab79'; break; 
-                            case 4: color = '#6b8e23'; break;
-                            default: color = '#a3bf8f';
-                        }
-                        ctx.fillStyle = color;
-                        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                    }
-                }
-            }
+</div>
 
-            function drawNPCs() {
-                npcs.forEach(npc => {
-                    if (npc.type === 5) drawKomaru(npc);
-                    if (npc.type === 6) drawTetsuji(npc);
-                });
-            }
+<div id="gameTitleOpening" class="game-title-opening" style="display: none;">
 
-            function drawGlitches() {
-                const colors = ['#ff00ff', '#ff99ff', '#ffffff', '#ff99ff'];
-                glitches.forEach(g => {
-                    if (!g.fixed) {
-                        g.flicker = (g.flicker + 1) % 40;
-                        ctx.globalAlpha = 0.7 + Math.sin(Date.now() / 200) * 0.3;
-                        if (g.id === 'ball') {
-                            ctx.fillStyle = 'white';
-                            ctx.beginPath();
-                            ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2);
-                            ctx.fill();
-                            ctx.strokeStyle = colors[Math.floor(g.flicker / 10)];
-                            ctx.lineWidth = 3;
-                            ctx.beginPath();
-                            ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/4, Math.PI*0.2, Math.PI*0.8);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/4, Math.PI*1.2, Math.PI*1.8);
-                            ctx.stroke();
-                        } else {
-                            ctx.fillStyle = colors[Math.floor(g.flicker / 10)];
-                            ctx.fillRect(g.x, g.y, g.size, g.size);
-                        }
-                        ctx.globalAlpha = 1.0;
-                    }
-                });
-            }
-            
-            // --- Game Logic ---
-            function update() {
-                player.isMoving = false;
-                let dx = 0;
-                let dy = 0;
-                if (keys['ArrowUp']) { dy -= player.speed; player.isMoving = true; }
-                if (keys['ArrowDown']) { dy += player.speed; player.isMoving = true; }
-                if (keys['ArrowLeft']) { dx -= player.speed; player.isMoving = true; }
-                if (keys['ArrowRight']) { dx += player.speed; player.isMoving = true; }
-                movePlayer(dx, dy);
-            }
+<p class="main-title">Rosetsu and the Simulated World</p>
 
-            function updateGlitches() {
-                glitches.forEach(g => {
-                    if (g.id === 'ball' && !g.fixed && tetsujiQuestAccepted) {
-                        if (g.vx === 0 && g.vy === 0) {
-                            g.vx = (Math.random() - 0.5) * 5 + 1;
-                            g.vy = (Math.random() - 0.5) * 5 + 1;
-                        }
-                        g.x += g.vx;
-                        g.y += g.vy;
-                        const playableAreaMargin = TILE_SIZE;
-                        if (g.x < playableAreaMargin || g.x + g.size > MAP_WIDTH - playableAreaMargin) {
-                            g.vx *= -1;
-                        }
-                        if (g.y < playableAreaMargin || g.y + g.size > MAP_HEIGHT - playableAreaMargin) {
-                            g.vy *= -1;
-                        }
-                        const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
-                        if (dist < player.size / 2 + (g.size / 3)) {
-                            g.fixed = true;
-                            handleGlitchFix('ball');
-                        }
-                    }
-                });
-            }
+</div>
 
-            function movePlayer(dx, dy) {
-                const nextX = player.x + dx;
-                const nextY = player.y + dy;
-                if (!isWall(nextX, player.y)) player.x = nextX;
-                if (!isWall(player.x, nextY)) player.y = nextY;
-            }
+<div id="perspectiveContainer" class="perspective-container" style="display: none;">
 
-            function isWall(x, y) {
-                const margin = 2;
-                const corners = [
-                    {x: x + margin, y: y + margin},
-                    {x: x + player.size - margin, y: y + margin},
-                    {x: x + margin, y: y + player.size - margin},
-                    {x: x + player.size - margin, y: y + player.size - margin}
-                ];
-                for(const corner of corners) {
-                    const tileX = Math.floor(corner.x / TILE_SIZE);
-                    const tileY = Math.floor(corner.y / TILE_SIZE);
-                    if (map[tileY] && (map[tileY][tileX] === 1 || map[tileY][tileX] === 3 || map[tileY][tileX] === 4 || map[tileY][tileX] === 5 || map[tileY][tileX] === 6)) {
-                        return true;
-                    }
-                }
-                return false;
-            }
+<div id="crawlContainer" class="crawl-container">
 
-            function interact() {
-                let interacted = false;
-                npcs.forEach(npc => {
-                    const dist = Math.hypot((player.x + player.size/2) - (npc.x + TILE_SIZE/2), (player.y + player.size/2) - (npc.y + TILE_SIZE/2));
-                    if (dist < TILE_SIZE * 1.2) {
-                        if (npc.id === 'tetsuji' && !tetsujiQuestAccepted) {
-                            tetsujiQuestAccepted = true;
-                            showDialogue(npc.dialogue, 3000, npc.id);
-                            setTimeout(() => {
-                                showDialogue("大変だ！あのボール、すごい勢いで動き出したぞ！", 3000, "ロセツ");
-                            }, 3100);
-                        } else {
-                            showDialogue(npc.dialogue, 4000, npc.id);
-                        }
-                        interacted = true;
-                    }
-                });
-                if (interacted) return;
+<div class="crawl-content">
 
-                glitches.forEach(g => {
-                    if (g.id === 'normal' && !g.fixed) {
-                        const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
-                        if (dist < TILE_SIZE) {
-                            g.fixed = true;
-                            interacted = true;
-                            handleGlitchFix('normal');
-                        }
-                    }
-                });
+<h3 class="crawl-episode-title">エピソード４<br>新たなる覚醒</h3>
 
-                if (!interacted) {
-                    showDialogue("クンクン…特に何もないみたいだ。", 2000, "ロセツ");
-                }
-            }
-            
-            function handleGlitchFix(glitchId) {
-                if (glitchId === 'ball') {
-                    showDialogue("この野球ボール…鉄二くんのだ！返してあげなきゃ！", 3000, "ロセツ");
-                    const tetsuji = npcs.find(n => n.id === 'tetsuji');
-                    tetsuji.dialogue = "わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！";
-                } else {
-                    showDialogue("よし、世界のバグを直した！", 3000, "ロセツ");
-                }
-                checkWinCondition();
-            }
+<p>もし、あなたの信じる日常が、偽りだとしたら？</p>
 
-            function checkWinCondition() {
-                if (glitches.every(g => g.fixed)) {
-                    showDialogue("やった！全部のバグを直したぞ！これでみんな安心だ！", 5000, "ロセツ", true);
-                }
-            }
-            
-            function showDialogue(text, duration = 3000, speaker = "ロセツ", isEnd = false) {
-                const container = document.getElementById('dialogue-container');
-                clearTimeout(dialogueTimeout);
-                
-                let speakerColor = "text-pink-500";
-                if(speaker === 'komaru') speakerColor = "text-green-600";
-                if(speaker === 'tetsuji') speakerColor = "text-yellow-700";
-                
-                const speakerName = {
-                    'komaru': 'コマル先輩',
-                    'tetsuji': '鉄二',
-                    'ロセツ': 'ロセツ'
-                }[speaker] || 'ロセツ';
+<p>&nbsp;</p>
 
-                const dialogueBox = `
-                    <div class="dialogue-box bg-white bg-opacity-90 p-4 rounded-lg shadow-xl border-2 border-gray-300 max-w-md w-full">
-                        <p class="text-gray-800 font-bold">
-                            <span class="${speakerColor}">${speakerName}:</span> ${text}
-                        </p>
-                        ${isEnd ? '<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>' : ''}
-                    </div>
-                `;
-                container.innerHTML = dialogueBox;
+<p>それは、食べてもなくならないドッグフードから始まった。</p>
 
-                dialogueTimeout = setTimeout(() => {
-                    container.innerHTML = '';
-                }, duration);
-            }
+<p>小さな違和感は、やがて世界の真実へと繋がる。</p>
 
-            // --- Game Start Function ---
-            const startGame = () => {
-                function gameLoop() {
-                    update();
-                    updateGlitches();
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    drawMap();
-                    drawNPCs();
-                    drawGlitches();
-                    drawRosetsu(player);
-                    requestAnimationFrame(gameLoop);
-                }
+<p>一匹のチワワが、世界の運命をその鼻先に委ねられる。</p>
 
-                function handleTouchStart(e) {
-                    if (!gameStarted) {
-                        gameStarted = true;
-                        showDialogue("お外の様子が変だ…パトロールしなきゃ！", 4000);
-                    }
-                }
-                canvas.addEventListener('touchstart', handleTouchStart, { once: true });
+<p>&nbsp;</p>
 
-                const setupBtn = (id, dir) => {
-                    const btn = document.getElementById(id);
-                    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = true; if (!gameStarted) gameStarted = true; });
-                    btn.addEventListener('pointerup', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
-                    btn.addEventListener('pointerleave', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
-                };
-                setupBtn('btn-up', 'Up');
-                setupBtn('btn-down', 'Down');
-                setupBtn('btn-left', 'Left');
-                setupBtn('btn-right', 'Right');
-                document.getElementById('btn-action').addEventListener('click', (e) => { e.preventDefault(); if (!gameStarted) gameStarted = true; interact(); });
-                
-                showDialogue("ゲーム画面をタップしてスタート！", 5000, "システム");
-                gameLoop();
-            }
+<p>白いチワワの男の子「ロセツ」。彼の日常は、温かい家族と優しい時間で満たされているはずだった。</p>
 
-            // --- Opening Sequence Logic ---
-            const skipOpening = () => {
-                if (openingSkipped) return;
-                openingSkipped = true;
+<p>&nbsp;</p>
 
-                openingSequence.style.display = 'none';
-                document.body.classList.add('game-body');
-                mainGame.style.display = 'flex';
-                startGame();
-            }
+<p>しかし、その生まれつき鋭すぎる嗅覚と聴覚は、人間には決して気づけない世界の“ノイズ”を拾ってしまう。</p>
 
-            openingSequence.addEventListener('click', skipOpening);
-            openingSequence.addEventListener('touchstart', skipOpening);
+<p>木の中から聞こえるはずのない電子音、昨日まで存在しなかった公園のブランコ、そして、何度食べても満たされることのない不思議なドッグフード。</p>
 
-            initialText.addEventListener('animationend', () => {
-                if (openingSkipped) return;
-                initialText.style.display = 'none';
-                starsContainer.style.display = 'block';
-                gameTitleOpening.style.display = 'block';
-            });
+<p>&nbsp;</p>
 
-            gameTitleOpening.addEventListener('animationend', () => {
-                if (openingSkipped) return;
-                gameTitleOpening.style.display = 'none';
-                perspectiveContainer.style.display = 'block';
-            });
+<p>それらはすべて、この世界が精巧なシミュレーションであり、今まさに崩壊の危機にあることを示す「バグ」だった。</p>
 
-            crawlContainer.addEventListener('animationend', () => {
-                 if (openingSkipped) return;
-                 skipOpening();
-            });
-        });
-    </script>
+<p>&nbsp;</p>
+
+<p>このまま綻びが広がれば、大好きな家族の笑顔も、共に過ごした温かい記憶も、すべてがエラーコードの彼方に消えてしまうかもしれない。</p>
+
+<p>&nbsp;</p>
+
+<p>ロセツは小さな胸に決意を秘める。</p>
+
+<p>鯨岡家の平和な日常を守るため、この世界の真実を突き止め、すべての「綻び」を修復する冒険に出ることを。</p>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<!-- Main Game (Initially Hidden) -->
+
+<div id="mainGame" style="display: none;" class="flex flex-col items-center justify-center min-h-screen p-4">
+
+<div id="game-container" class="w-full max-w-2xl mx-auto">
+
+<h1 class="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-4">Rosetsu and the Simulated World</h1>
+
+<canvas id="gameCanvas"></canvas>
+
+</div>
+
+<div id="dialogue-container" class="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-10"></div>
+
+<div id="controls" class="mt-4 grid grid-cols-3 gap-2 w-full max-w-xs">
+
+<div></div>
+
+<button id="btn-up" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↑</button>
+
+<div></div>
+
+<button id="btn-left" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">←</button>
+
+<button id="btn-down" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">↓</button>
+
+<button id="btn-right" class="control-btn bg-gray-400 text-white p-4 rounded-lg shadow-md">→</button>
+
+<button id="btn-action" class="control-btn bg-lime-400 text-white p-4 rounded-lg shadow-md col-span-3">TALK / CHECK</button>
+
+</div>
+
+</div>
+
+
+
+<script type="module">
+
+// DOMの読み込みが完了してからスクリプト全体を実行
+
+window.addEventListener('DOMContentLoaded', () => {
+
+
+
+// --- DOM Elements ---
+
+const openingSequence = document.getElementById('openingSequence');
+
+const initialText = document.getElementById('initialText');
+
+const gameTitleOpening = document.getElementById('gameTitleOpening');
+
+const perspectiveContainer = document.getElementById('perspectiveContainer');
+
+const crawlContainer = document.getElementById('crawlContainer');
+
+const mainGame = document.getElementById('mainGame');
+
+const starsContainer = document.getElementById('starsContainer');
+
+const canvas = document.getElementById('gameCanvas');
+
+const ctx = canvas.getContext('2d');
+
+
+
+// --- Game Constants & State ---
+
+const TILE_SIZE = 40;
+
+let map = [
+
+[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+
+[1, 0, 3, 0, 0, 1, 0, 5, 0, 1, 0, 0, 3, 0, 1],
+
+[1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0, 0, 1],
+
+[1, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 1],
+
+[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+
+[1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8, 0, 1],
+
+[1, 0, 3, 0, 0, 1, 0, 7, 0, 1, 0, 0, 3, 0, 1],
+
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+
+[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+
+];
+
+
+const MAP_WIDTH = map[0].length * TILE_SIZE;
+
+const MAP_HEIGHT = map.length * TILE_SIZE;
+
+
+
+canvas.width = MAP_WIDTH;
+
+canvas.height = MAP_HEIGHT;
+
+
+
+const player = {
+
+x: TILE_SIZE * 1.5,
+
+y: TILE_SIZE * 8,
+
+size: TILE_SIZE * 0.9,
+
+speed: 4,
+
+isMoving: false,
+
+frame: 0
+
+};
+
+
+
+const npcs = [];
+
+const glitches = [];
+
+map.forEach((row, y) => {
+
+row.forEach((tile, x) => {
+
+const pos = { x: x * TILE_SIZE, y: y * TILE_SIZE };
+
+if (tile === 5) { // Komaru
+
+npcs.push({ ...pos, id: 'komaru', type: 5, dialogue: "ロセちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！" });
+
+} else if (tile === 6) { // Tetsuji
+
+npcs.push({ ...pos, id: 'tetsuji', type: 6, dialogue: "うぅ…首輪についてたももちゃんにもらった大事な野球ボールが、変な光と共になくなっちゃったんだ…" });
+
+} else if (tile === 7 || tile === 8) { // Glitches
+
+glitches.push({ ...pos, size: TILE_SIZE, id: tile === 7 ? 'normal' : 'ball', fixed: false, flicker: 0, vx: 0, vy: 0 });
+
+}
+
+});
+
+});
+
+
+
+let keys = {};
+
+let gameStarted = false;
+
+let tetsujiQuestAccepted = false;
+
+let openingSkipped = false;
+
+let dialogueTimeout;
+
+
+
+// --- Drawing Functions ---
+
+function drawRosetsu(p) {
+
+ctx.save();
+
+ctx.translate(p.x + p.size / 2, p.y + p.size / 2);
+
+if (p.isMoving) {
+
+ctx.translate(0, Math.sin(Date.now() / 100) * 2);
+
+}
+
+ctx.fillStyle = 'white';
+
+ctx.strokeStyle = 'black';
+
+ctx.lineWidth = 2;
+
+ctx.beginPath();
+
+ctx.ellipse(0, p.size * 0.1, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
+
+ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.5, -p.size * 0.3, -p.size * 0.15);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.moveTo(p.size * 0.2, -p.size * 0.3);
+
+ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.5, p.size * 0.3, -p.size * 0.15);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.fillStyle = 'black';
+
+ctx.beginPath();
+
+ctx.arc(-p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2);
+
+ctx.arc(p.size * 0.1, -p.size * 0.2, 1.5, 0, Math.PI * 2);
+
+ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.fillStyle = '#FF9800';
+
+ctx.beginPath();
+
+ctx.ellipse(0, p.size * 0.15, p.size*0.05, p.size*0.12, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.fillStyle = '#FF7043';
+
+ctx.beginPath();
+
+ctx.moveTo(0, p.size * 0.05);
+
+ctx.lineTo(-p.size*0.08, p.size*0.02);
+
+ctx.lineTo(p.size*0.08, p.size*0.02);
+
+ctx.closePath();
+
+ctx.fill();
+
+ctx.restore();
+
+}
+
+
+
+function drawKomaru(npc) {
+
+ctx.save();
+
+ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
+
+const p = { size: TILE_SIZE * 0.9 };
+
+ctx.fillStyle = 'white';
+
+ctx.strokeStyle = 'black';
+
+ctx.lineWidth = 2;
+
+ctx.beginPath();
+
+ctx.ellipse(0, p.size * 0.15, p.size * 0.28, p.size * 0.4, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.ellipse(0, -p.size * 0.2, p.size * 0.35, p.size * 0.25, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.moveTo(-p.size * 0.2, -p.size * 0.3);
+
+ctx.quadraticCurveTo(-p.size * 0.4, -p.size * 0.45, -p.size * 0.35, -p.size * 0.15);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.moveTo(p.size * 0.2, -p.size * 0.3);
+
+ctx.quadraticCurveTo(p.size * 0.4, -p.size * 0.45, p.size * 0.35, -p.size * 0.15);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.fillStyle = 'black';
+
+ctx.beginPath();
+
+ctx.arc(-p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2);
+
+ctx.arc(p.size * 0.12, -p.size * 0.2, 1.5, 0, Math.PI * 2);
+
+ctx.arc(0, -p.size * 0.15, 1.5, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.strokeStyle = 'black';
+
+ctx.lineWidth = 1.5;
+
+ctx.beginPath();
+
+ctx.moveTo(-p.size*0.1, -p.size*0.1);
+
+ctx.quadraticCurveTo(0, -p.size*0.07, p.size*0.1, -p.size*0.1);
+
+ctx.stroke();
+
+ctx.lineWidth = 2;
+
+ctx.beginPath();
+
+ctx.moveTo(-p.size * 0.22, -p.size * 0.4);
+
+ctx.lineTo(-p.size * 0.1, -p.size * 0.3);
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.moveTo(p.size * 0.22, -p.size * 0.4);
+
+ctx.lineTo(p.size * 0.1, -p.size * 0.3);
+
+ctx.stroke();
+
+ctx.restore();
+
+}
+
+
+function drawTetsuji(npc) {
+
+ctx.save();
+
+ctx.translate(npc.x + TILE_SIZE / 2, npc.y + TILE_SIZE / 2);
+
+const p = { size: TILE_SIZE };
+
+ctx.fillStyle = '#f5deb3';
+
+ctx.strokeStyle = 'black';
+
+ctx.lineWidth = 2;
+
+ctx.beginPath();
+
+ctx.ellipse(0, p.size * 0.25, p.size * 0.5, p.size * 0.3, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.ellipse(0, -p.size * 0.1, p.size * 0.4, p.size * 0.28, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.ellipse(-p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.ellipse(p.size * 0.35, -p.size * 0.1, p.size * 0.16, p.size * 0.14, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.stroke();
+
+ctx.fillStyle = '#3d3532';
+
+ctx.beginPath();
+
+ctx.ellipse(0, 0, p.size * 0.25, p.size * 0.1, 0, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.fillStyle = 'black';
+
+ctx.beginPath();
+
+ctx.arc(-p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2);
+
+ctx.arc( p.size * 0.15, -p.size * 0.12, p.size * 0.05, 0, Math.PI * 2);
+
+ctx.arc( 0, p.size * 0.02, p.size * 0.04, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.fillStyle = 'white';
+
+ctx.beginPath();
+
+ctx.arc(-p.size * 0.13, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
+
+ctx.arc( p.size * 0.17, -p.size * 0.14, p.size * 0.015, 0, Math.PI * 2);
+
+ctx.fill();
+
+ctx.strokeStyle = 'white';
+
+ctx.lineWidth = 1.5;
+
+ctx.beginPath();
+
+ctx.moveTo(-p.size * 0.08, p.size * 0.08);
+
+ctx.quadraticCurveTo(0, p.size * 0.12, p.size * 0.08, p.size * 0.08);
+
+ctx.stroke();
+
+ctx.strokeStyle = '#3d3532';
+
+ctx.lineWidth = 4;
+
+ctx.lineCap = 'round';
+
+ctx.beginPath();
+
+ctx.moveTo(-p.size * 0.2, -p.size * 0.22);
+
+ctx.quadraticCurveTo(-p.size * 0.12, -p.size * 0.3, -p.size * 0.04, -p.size * 0.22);
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.moveTo(p.size * 0.2, -p.size * 0.22);
+
+ctx.quadraticCurveTo(p.size * 0.12, -p.size * 0.3, p.size * 0.04, -p.size * 0.22);
+
+ctx.stroke();
+
+ctx.restore();
+
+}
+
+
+
+function drawMap() {
+
+for (let y = 0; y < map.length; y++) {
+
+for (let x = 0; x < map[y].length; x++) {
+
+let color;
+
+switch(map[y][x]) {
+
+case 1: color = '#7a6855'; break;
+
+case 3: color = '#8aab79'; break;
+
+case 4: color = '#6b8e23'; break;
+
+default: color = '#a3bf8f';
+
+}
+
+ctx.fillStyle = color;
+
+ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+}
+
+}
+
+}
+
+
+
+function drawNPCs() {
+
+npcs.forEach(npc => {
+
+if (npc.type === 5) drawKomaru(npc);
+
+if (npc.type === 6) drawTetsuji(npc);
+
+});
+
+}
+
+
+
+function drawGlitches() {
+
+const colors = ['#ff00ff', '#ff99ff', '#ffffff', '#ff99ff'];
+
+glitches.forEach(g => {
+
+if (!g.fixed) {
+
+g.flicker = (g.flicker + 1) % 40;
+
+ctx.globalAlpha = 0.7 + Math.sin(Date.now() / 200) * 0.3;
+
+if (g.id === 'ball') {
+
+ctx.fillStyle = 'white';
+
+ctx.beginPath();
+
+ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2);
+
+ctx.fill();
+
+ctx.strokeStyle = colors[Math.floor(g.flicker / 10)];
+
+ctx.lineWidth = 3;
+
+ctx.beginPath();
+
+ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/4, Math.PI*0.2, Math.PI*0.8);
+
+ctx.stroke();
+
+ctx.beginPath();
+
+ctx.arc(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2, TILE_SIZE/4, Math.PI*1.2, Math.PI*1.8);
+
+ctx.stroke();
+
+} else {
+
+ctx.fillStyle = colors[Math.floor(g.flicker / 10)];
+
+ctx.fillRect(g.x, g.y, g.size, g.size);
+
+}
+
+ctx.globalAlpha = 1.0;
+
+}
+
+});
+
+}
+
+
+// --- Game Logic ---
+
+function update() {
+
+player.isMoving = false;
+
+let dx = 0;
+
+let dy = 0;
+
+if (keys['ArrowUp']) { dy -= player.speed; player.isMoving = true; }
+
+if (keys['ArrowDown']) { dy += player.speed; player.isMoving = true; }
+
+if (keys['ArrowLeft']) { dx -= player.speed; player.isMoving = true; }
+
+if (keys['ArrowRight']) { dx += player.speed; player.isMoving = true; }
+
+movePlayer(dx, dy);
+
+}
+
+
+
+function updateGlitches() {
+
+glitches.forEach(g => {
+
+if (g.id === 'ball' && !g.fixed && tetsujiQuestAccepted) {
+
+if (g.vx === 0 && g.vy === 0) {
+
+g.vx = (Math.random() - 0.5) * 5 + 1;
+
+g.vy = (Math.random() - 0.5) * 5 + 1;
+
+}
+
+g.x += g.vx;
+
+g.y += g.vy;
+
+const playableAreaMargin = TILE_SIZE;
+
+if (g.x < playableAreaMargin || g.x + g.size > MAP_WIDTH - playableAreaMargin) {
+
+g.vx *= -1;
+
+}
+
+if (g.y < playableAreaMargin || g.y + g.size > MAP_HEIGHT - playableAreaMargin) {
+
+g.vy *= -1;
+
+}
+
+const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
+
+if (dist < player.size / 2 + (g.size / 3)) {
+
+g.fixed = true;
+
+handleGlitchFix('ball');
+
+}
+
+}
+
+});
+
+}
+
+
+
+function movePlayer(dx, dy) {
+
+const nextX = player.x + dx;
+
+const nextY = player.y + dy;
+
+if (!isWall(nextX, player.y)) player.x = nextX;
+
+if (!isWall(player.x, nextY)) player.y = nextY;
+
+}
+
+
+
+function isWall(x, y) {
+
+const margin = 2;
+
+const corners = [
+
+{x: x + margin, y: y + margin},
+
+{x: x + player.size - margin, y: y + margin},
+
+{x: x + margin, y: y + player.size - margin},
+
+{x: x + player.size - margin, y: y + player.size - margin}
+
+];
+
+for(const corner of corners) {
+
+const tileX = Math.floor(corner.x / TILE_SIZE);
+
+const tileY = Math.floor(corner.y / TILE_SIZE);
+
+if (map[tileY] && (map[tileY][tileX] === 1 || map[tileY][tileX] === 3 || map[tileY][tileX] === 4 || map[tileY][tileX] === 5 || map[tileY][tileX] === 6)) {
+
+return true;
+
+}
+
+}
+
+return false;
+
+}
+
+
+
+function interact() {
+
+let interacted = false;
+
+npcs.forEach(npc => {
+
+const dist = Math.hypot((player.x + player.size/2) - (npc.x + TILE_SIZE/2), (player.y + player.size/2) - (npc.y + TILE_SIZE/2));
+
+if (dist < TILE_SIZE * 1.2) {
+
+if (npc.id === 'tetsuji' && !tetsujiQuestAccepted) {
+
+tetsujiQuestAccepted = true;
+
+showDialogue(npc.dialogue, 3000, npc.id);
+
+setTimeout(() => {
+
+showDialogue("大変だ！あのボール、すごい勢いで動き出したぞ！", 3000, "ロセツ");
+
+}, 3100);
+
+} else {
+
+showDialogue(npc.dialogue, 4000, npc.id);
+
+}
+
+interacted = true;
+
+}
+
+});
+
+if (interacted) return;
+
+
+
+glitches.forEach(g => {
+
+if (g.id === 'normal' && !g.fixed) {
+
+const dist = Math.hypot((player.x + player.size/2) - (g.x + TILE_SIZE/2), (player.y + player.size/2) - (g.y + TILE_SIZE/2));
+
+if (dist < TILE_SIZE) {
+
+g.fixed = true;
+
+interacted = true;
+
+handleGlitchFix('normal');
+
+}
+
+}
+
+});
+
+
+
+if (!interacted) {
+
+showDialogue("クンクン…特に何もないみたいだ。", 2000, "ロセツ");
+
+}
+
+}
+
+
+function handleGlitchFix(glitchId) {
+
+if (glitchId === 'ball') {
+
+showDialogue("この野球ボール…鉄二くんのだ！返してあげなきゃ！", 3000, "ロセツ");
+
+const tetsuji = npcs.find(n => n.id === 'tetsuji');
+
+tetsuji.dialogue = "わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！";
+
+} else {
+
+showDialogue("よし、世界のバグを直した！", 3000, "ロセツ");
+
+}
+
+checkWinCondition();
+
+}
+
+
+
+function checkWinCondition() {
+
+if (glitches.every(g => g.fixed)) {
+
+showDialogue("やった！全部のバグを直したぞ！これでみんな安心だ！", 5000, "ロセツ", true);
+
+}
+
+}
+
+
+function showDialogue(text, duration = 3000, speaker = "ロセツ", isEnd = false) {
+
+const container = document.getElementById('dialogue-container');
+
+clearTimeout(dialogueTimeout);
+
+
+let speakerColor = "text-pink-500";
+
+if(speaker === 'komaru') speakerColor = "text-green-600";
+
+if(speaker === 'tetsuji') speakerColor = "text-yellow-700";
+
+
+const speakerName = {
+
+'komaru': 'コマル先輩',
+
+'tetsuji': '鉄二',
+
+'ロセツ': 'ロセツ'
+
+}[speaker] || 'ロセツ';
+
+
+
+const dialogueBox = `
+
+<div class="dialogue-box bg-white bg-opacity-90 p-4 rounded-lg shadow-xl border-2 border-gray-300 max-w-md w-full">
+
+<p class="text-gray-800 font-bold">
+
+<span class="${speakerColor}">${speakerName}:</span> ${text}
+
+</p>
+
+${isEnd ? '<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>' : ''}
+
+</div>
+
+`;
+
+container.innerHTML = dialogueBox;
+
+
+
+dialogueTimeout = setTimeout(() => {
+
+container.innerHTML = '';
+
+}, duration);
+
+}
+
+
+
+// --- Game Start Function ---
+
+const startGame = () => {
+
+function gameLoop() {
+
+update();
+
+updateGlitches();
+
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+drawMap();
+
+drawNPCs();
+
+drawGlitches();
+
+drawRosetsu(player);
+
+requestAnimationFrame(gameLoop);
+
+}
+
+
+
+function handleTouchStart(e) {
+
+if (!gameStarted) {
+
+gameStarted = true;
+
+showDialogue("お外の様子が変だ…パトロールしなきゃ！", 4000);
+
+}
+
+}
+
+canvas.addEventListener('touchstart', handleTouchStart, { once: true });
+
+
+
+const setupBtn = (id, dir) => {
+
+const btn = document.getElementById(id);
+
+btn.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = true; if (!gameStarted) gameStarted = true; });
+
+btn.addEventListener('pointerup', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
+
+btn.addEventListener('pointerleave', (e) => { e.preventDefault(); keys[`Arrow${dir}`] = false; });
+
+};
+
+setupBtn('btn-up', 'Up');
+
+setupBtn('btn-down', 'Down');
+
+setupBtn('btn-left', 'Left');
+
+setupBtn('btn-right', 'Right');
+
+document.getElementById('btn-action').addEventListener('click', (e) => { e.preventDefault(); if (!gameStarted) gameStarted = true; interact(); });
+
+
+showDialogue("ゲーム画面をタップしてスタート！", 5000, "システム");
+
+gameLoop();
+
+}
+
+
+
+// --- Opening Sequence Logic ---
+
+const skipOpening = () => {
+
+if (openingSkipped) return;
+
+openingSkipped = true;
+
+
+
+openingSequence.style.display = 'none';
+
+document.body.classList.add('game-body');
+
+mainGame.style.display = 'flex';
+
+startGame();
+
+}
+
+
+
+openingSequence.addEventListener('click', skipOpening);
+
+openingSequence.addEventListener('touchstart', skipOpening);
+
+
+
+initialText.addEventListener('animationend', () => {
+
+if (openingSkipped) return;
+
+initialText.style.display = 'none';
+
+starsContainer.style.display = 'block';
+
+gameTitleOpening.style.display = 'block';
+
+});
+
+
+
+gameTitleOpening.addEventListener('animationend', () => {
+
+if (openingSkipped) return;
+
+gameTitleOpening.style.display = 'none';
+
+perspectiveContainer.style.display = 'block';
+
+});
+
+
+
+crawlContainer.addEventListener('animationend', () => {
+
+if (openingSkipped) return;
+
+skipOpening();
+
+});
+
+});
+
+</script>
+
 </body>
+
 </html>
