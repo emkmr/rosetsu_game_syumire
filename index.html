@@ -1,34 +1,25 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <!-- ホーム画面アイコン -->
-<link rel="apple-touch-icon" href="icon.png">
-<link rel="apple-touch-icon" href="icons/icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-<!-- 任意：PWA対応するなら manifest も。ファイル用意後に有効化 -->
-<!-- <link rel="manifest" href="manifest.webmanifest"> -->
-
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
   <title>ロセツGAME2</title>
-  
-  <!-- ▼ ホーム画面アイコン（追加） -->
-  <link rel="apple-touch-icon" href="icon.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
-  <!-- （任意）manifest を使う場合は下記を有効化し、サイト直下に manifest.webmanifest を置く
-  <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#ff4da6">
-  -->
-  <!-- ▲ ここまで追加 -->
 
+  <!-- PWA / Icons (重複とパス不整合を解消) -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png" />
+
+  <!-- Fonts & Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet" />
+
   <style>
     body { font-family: 'Noto Sans JP', sans-serif; background:#000; margin:0; overflow:hidden; }
 
-    /* --- Opening Styles (元データを維持) --- */
+    /* --- Opening Styles --- */
     #openingSequence { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
     .stars { position:absolute; inset:0; background:transparent; }
     .stars-small { background-image: radial-gradient(1px 1px at 20px 30px, #eee, rgba(0,0,0,0)), radial-gradient(1px 1px at 40px 70px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 50px 160px, #ddd, rgba(0,0,0,0)), radial-gradient(1px 1px at 90px 40px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 130px 80px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 160px 120px, #ddd, rgba(0,0,0,0)); background-size: 200px 200px; animation: zoom 25s infinite; }
@@ -50,7 +41,7 @@
 
     /* --- Game Styles --- */
     .game-body { background:#f0f0f0; }
-    #gameCanvas { display:block; background:#eaeaea; border:2px solid #333; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,.1); image-rendering: pixelated; width:100%; height:auto; }
+    #gameCanvas { display:block; background:#eaeaea; border:2px solid #333; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,.1); image-rendering: pixelated; width:100%; height:auto; touch-action:none; }
     .control-btn { transition: all .1s ease-in-out; user-select:none; }
     .control-btn:active { transform: scale(.92); }
     .dialogue-box { animation: slide-up .28s ease-out forwards; }
@@ -59,7 +50,6 @@
     #controls { padding-bottom: calc(var(--safe-bottom,0) + .25rem); }
     #btn-up, #btn-down, #btn-left, #btn-right { display:none; }
     * { -webkit-user-select: none; user-select: none; }
-    #gameCanvas { touch-action: none; }
     /* 画面拡張：TALKボタンだけ右下にフローティング */
     #controls{ position:fixed; inset:auto 12px calc(env(safe-area-inset-bottom) + 12px) auto; width:auto; display:block; background:transparent; box-shadow:none; z-index:25; }
     #btn-action{ padding:14px 18px; border-radius:9999px; font-weight:700; }
@@ -135,9 +125,7 @@
     // ===== Layout (iPhone考慮) =====
     const camera = { x:0, y:0, w:0, h:0, dpr:1 };
     function layoutCanvas(){
-      // コントロール（矢印）を撤去したので下部の余白は0扱い
-      const controlsHeight = 0;
-      const desiredHeight = Math.max(260, window.innerHeight - 24); // ほぼ全高
+      const desiredHeight = Math.max(260, window.innerHeight - 24);
       const desiredWidth  = Math.min(window.innerWidth, 820);
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.style.width = desiredWidth + 'px';
@@ -145,7 +133,6 @@
       canvas.width  = Math.floor(desiredWidth * dpr);
       canvas.height = Math.floor(desiredHeight * dpr);
       camera.w = desiredWidth; camera.h = desiredHeight; camera.dpr = dpr;
-      // セリフは上部固定（ノッチ安全域対応）
       dialogueEl.style.bottom = '';
       dialogueEl.style.top = 'calc(env(safe-area-inset-top) + 8px)';
     }
@@ -183,13 +170,12 @@
     const player = { x: START_TX*TILE_SIZE, y: START_TY*TILE_SIZE, size:TILE_SIZE*0.9, speed:4.2, isMoving:false };
     const keys = {}; let gameStarted=false; let tetsujiQuestAccepted=false; let dialogueTimeout;
 
-    // "波動バグ"（音の波アトラクション）とフラッシュ演出
     const anomalies = []; // {x,y,age,life,maxR,hit:false,rings:3}
     let anomalyTimer = 0; // 次のスポーンまでの残りms
-    const flash = { t:0, dur:0, stars:[], cb:null }; // t>0 の間、真ピンクで覆う
-    let inputLockedUntil = 0; // フラッシュ中は移動をロック
+    const flash = { t:0, dur:0, stars:[], cb:null }; // フラッシュ制御
+    let inputLockedUntil = 0; // フラッシュ中の入力ロック
 
-    // タップ移動コントロール（画面タッチ方向へ移動）
+    // タップ移動コントロール
     const touch = { active:false, wx:0, wy:0 };
 
     const npcs = [
@@ -201,8 +187,7 @@
     const glitches = [
       { id:'normal', x:(START_TX+8)*TILE_SIZE, y:(START_TY-4)*TILE_SIZE, size:TILE_SIZE, fixed:false },
       { id:'normal', x:33*TILE_SIZE, y:18*TILE_SIZE, size:TILE_SIZE, fixed:false },
-      // ball はクエスト受注後に近接出現（見えるが即取れない）
-      { id:'ball', x:44*TILE_SIZE, y:26*TILE_SIZE, size:TILE_SIZE, fixed:false, vx:0, vy:0, flicker:0, state:'idle', timer:0, immune:0 }
+      { id:'ball',   x:44*TILE_SIZE, y:26*TILE_SIZE, size:TILE_SIZE, fixed:false, vx:0, vy:0, flicker:0, state:'idle', timer:0, immune:0 }
     ];
 
     // MapにNPCをソリッド配置
@@ -219,13 +204,10 @@
 
     // ===== Input =====
     function setupControls(){
-      // TALK/CHECK は残す
       document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
-      // 物理キーボード併用可（開発時）
       window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }});
       window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
 
-      // Pointer-based move: 画面を押した方向へ進む（ドラッグで方向変更、指を離すと停止）
       const toWorld = (e) => {
         const r = canvas.getBoundingClientRect();
         const sx = (e.clientX - r.left) * (canvas.width / r.width);
@@ -234,7 +216,6 @@
       };
 
       const tryAnomalyHit = (p)=>{
-        // どれかのリングの縁に触れたらヒット
         for(const a of anomalies){
           if(a.hit) continue;
           for(let i=0;i<(a.rings||1);i++){
@@ -272,15 +253,13 @@
       for(const c of corners){
         const tx=Math.floor(c.x/TILE_SIZE), ty=Math.floor(c.y/TILE_SIZE);
         const id=map[ty]?.[tx];
-        // 共通の衝突: 壁(1)・障害物(3/4)
-        if(id===1||id===3||id===4) return true;
-        // プレイヤーのみNPCタイル(5/6)にぶつかる
-        if(actor==='player' && (id===5||id===6)) return true;
+        if(id===1||id===3||id===4) return true; // 壁・障害物
+        if(actor==='player' && (id===5||id===6)) return true; // NPC
       }
       return false;
     }
 
-    // ===== Draw (顔パーツを元どおり) =====
+    // ===== Draw =====
     function drawMap(){
       const sc=Math.max(0,Math.floor(camera.x/TILE_SIZE)-1), ec=Math.min(WORLD_COLS-1,Math.ceil((camera.x+camera.w)/TILE_SIZE)+1);
       const sr=Math.max(0,Math.floor(camera.y/TILE_SIZE)-1), er=Math.min(WORLD_ROWS-1,Math.ceil((camera.y+camera.h)/TILE_SIZE)+1);
@@ -307,7 +286,6 @@
       ctx.beginPath(); ctx.moveTo(p.size*.2,-p.size*.3); ctx.quadraticCurveTo(p.size*.4,-p.size*.45,p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke();
       ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(0,-p.size*.15,1.5,0,Math.PI*2); ctx.fill();
       ctx.strokeStyle='black'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-p.size*.1,-p.size*.1); ctx.quadraticCurveTo(0,-p.size*.07,p.size*.1,-p.size*.1); ctx.stroke();
-      // ヒント
       if(!tetsujiQuestAccepted && dist(player.x,player.y,n.x,n.y)<TILE_SIZE*3){ ctx.fillStyle='#ffcc00'; ctx.font='bold 18px sans-serif'; ctx.fillText('！', -4, -p.size*.8); }
       ctx.restore();
     }
@@ -331,7 +309,7 @@
           if(g.id==='ball'){
             const isTele = (g.state==='telegraph');
             ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = isTele ? '#ff66ff' : colors[(g.flicker>>>3)%colors.length]; ctx.lineWidth = isTele?3:3;
+            ctx.strokeStyle = isTele ? '#ff66ff' : colors[(g.flicker>>>3)%colors.length]; ctx.lineWidth = 3;
             ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*0.2, Math.PI*0.8); ctx.stroke();
             ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*1.2, Math.PI*1.8); ctx.stroke();
           } else {
@@ -350,13 +328,11 @@
     }
     function updatePlayer(){
       player.isMoving=false; let dx=0, dy=0; const now=performance.now();
-      if(now < inputLockedUntil){ movePlayer(0,0); return; }
-      // 物理キー（開発向け）
+      if(now < inputLockedUntil){ return; }
       if(keys.ArrowUp) dy -= player.speed;
       if(keys.ArrowDown) dy += player.speed;
       if(keys.ArrowLeft) dx -= player.speed;
       if(keys.ArrowRight) dx += player.speed;
-      // タップ移動
       if(touch.active){
         const cx = player.x + player.size/2, cy = player.y + player.size/2;
         const vx = touch.wx - cx, vy = touch.wy - cy; const d = Math.hypot(vx, vy);
@@ -365,7 +341,6 @@
       if(dx||dy) player.isMoving=true; movePlayer(dx, dy);
     }
 
-    // 自動歩行（ソフトリード＋たまに方向転換）
     function updateNPCs(dt){
       npcs.forEach(n=>{
         n.wander -= dt; if(n.wander<=0){ const ang=Math.random()*Math.PI*2; n.vx=Math.cos(ang)*n.speed; n.vy=Math.sin(ang)*n.speed; n.wander = 1200+Math.random()*1800; }
@@ -374,13 +349,13 @@
       });
     }
 
-    // ボールを近接リングにスポーン→テレグラフ→逃走
+    // ボール近接スポーン→テレグラフ→逃走
     function spawnBallNearPlayer(){
       const ball = glitches.find(g=>g.id==='ball'); if(!ball) return;
       const R = TILE_SIZE*5; let ang = Math.random()*Math.PI*2;
       const bx = clamp(player.x + Math.cos(ang)*R, TILE_SIZE, world.w - TILE_SIZE*2);
       const by = clamp(player.y + Math.sin(ang)*R, TILE_SIZE, world.h - TILE_SIZE*2);
-      ball.x=bx; ball.y=by; ball.state='telegraph'; ball.timer=900; ball.immune=900; ball.vx=0; ball.vy=0; ball.fixed=false;
+      ball.x=bx; ball.y=by; ball.size=TILE_SIZE; ball.state='telegraph'; ball.timer=900; ball.immune=900; ball.vx=0; ball.vy=0; ball.fixed=false;
       showDialogue('？？？: なにかが現れた…', 1200, 'システム');
     }
 
@@ -388,7 +363,7 @@
       const ball = glitches.find(g=>g.id==='ball'); if(!ball || ball.fixed) return;
       if(ball.state==='idle') return; // 受注前
       if(ball.state==='telegraph'){
-        ball.timer -= dt; // 点滅演出は draw で色替え
+        ball.timer -= dt;
         if(ball.timer<=0){ const ang=Math.atan2(ball.y-player.y, ball.x-player.x); const spd=2.8; ball.vx=Math.cos(ang)*spd; ball.vy=Math.sin(ang)*spd; ball.state='run'; ball.timer=1800; showDialogue('ボール: ピコッ！', 900, 'システム'); }
         return;
       }
@@ -404,12 +379,11 @@
     }
 
     function updateGlitches(){
-      // 通常バグの近接修復
       glitches.forEach(g=>{
         if(g.id==='normal' && !g.fixed){ const d=dist(player.x+player.size/2,player.y+player.size/2,g.x+TILE_SIZE/2,g.y+TILE_SIZE/2); if(d<TILE_SIZE){ g.fixed=true; handleGlitchFix('normal'); } }
       });
     }
-    
+
     // ===== Anomaly (音の波動) =====
     function spawnAnomaly(){
       const margin = TILE_SIZE*3;
@@ -429,18 +403,16 @@
     function drawAnomalies(){
       ctx.save();
       anomalies.forEach(a=>{
-        // 複数リング（rings本）：各リングは位相オフセットで循環
         for(let i=0;i<a.rings;i++){
           const phase = (a.age/a.life + i/a.rings) % 1; // 0..1
           const r = a.maxR * phase;
           const alpha = 0.75 * (1 - phase);
           ctx.beginPath();
           ctx.arc(a.x, a.y, r, 0, Math.PI*2);
-          ctx.strokeStyle = rgba(255,105,180,${alpha});
+          ctx.strokeStyle = 'rgba(255,105,180,' + alpha + ')';
           ctx.lineWidth = 4;
           ctx.stroke();
         }
-        // 中心の“音源”
         const pulse = 1 + 0.25 * Math.sin(a.age/120);
         ctx.beginPath();
         ctx.arc(a.x, a.y, 6*pulse, 0, Math.PI*2);
@@ -450,21 +422,16 @@
       ctx.restore();
     }
     function triggerFlash(){
-      // ピンク宇宙フラッシュ：少し長め & 星を発生
-      flash.dur = 1200; // ms
-      flash.t   = flash.dur;
-      // 入力ロックはフラッシュが終わるまで
+      flash.dur = 1200; flash.t = flash.dur;
       inputLockedUntil = performance.now() + flash.dur + 40;
-      // スクリーン座標で星を生成（密度は画面サイズ依存）
       const area = canvas.width * canvas.height;
       const count = Math.max(80, Math.min(220, Math.floor(area / 8000)));
       flash.stars = Array.from({length: count}, () => ({
         x: Math.random()*canvas.width,
         y: Math.random()*canvas.height,
         r: 0.6 + Math.random()*1.8,
-        tw: Math.random()*Math.PI*2 // twinkle phase
+        tw: Math.random()*Math.PI*2
       }));
-      // 終了時のセリフ
       flash.cb = () => {
         showDialogue('今のは、、、宇宙に見えた、、、ピンクの空に星。なんなんだ、、、、まぼろし？？', 3200, 'ロセツ');
       };
@@ -473,32 +440,23 @@
       if(flash.t<=0) return;
       flash.t -= dt;
       const k = Math.max(0, flash.t/flash.dur); // 1→0
-      // 画面全体（スクリーン座標）にピンク宇宙を描画
       ctx.save();
       ctx.setTransform(1,0,0,1,0,0);
-      // 背景ピンク（少しフェードアウト）
       ctx.globalAlpha = 0.92 * (0.4 + 0.6*k);
       ctx.fillStyle = '#ff0099';
       ctx.fillRect(0,0,canvas.width,canvas.height);
-
-      // 星（白〜淡ピンク）、ゆっくり上方向へ流れ＆チカチカ
       const tnow = performance.now();
       ctx.globalAlpha = 1.0;
       for(const s of flash.stars){
-        const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw); // 0.2 振幅
-        const y  = s.y - (1.2 * (1-k)); // 終盤ほど少し上に流れる
+        const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw);
+        const y  = s.y - (1.2 * (1-k));
         ctx.beginPath();
         ctx.arc(s.x, y, s.r*tw, 0, Math.PI*2);
-        // 交互に白系/ピンク系
         ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)';
         ctx.fill();
       }
       ctx.restore();
-
-      // フラッシュ終了時のコールバック（1回だけ）
-      if(flash.t<=0 && typeof flash.cb === 'function'){
-        const cb = flash.cb; flash.cb = null; cb();
-      }
+      if(flash.t<=0 && typeof flash.cb === 'function'){ const cb = flash.cb; flash.cb = null; cb(); }
     }
 
     // ===== Interact / Dialogue =====
@@ -506,10 +464,11 @@
       clearTimeout(dialogueTimeout);
       let color='text-pink-500'; if(speaker==='komaru') color='text-green-600'; if(speaker==='tetsuji') color='text-yellow-700'; if(speaker==='システム') color='text-blue-600';
       const speakerName = { komaru:'コマル先輩', tetsuji:'鉄二', 'ロセツ':'ロセツ', 'システム':'システム' }[speaker] || 'ロセツ';
-      const html = <div class="dialogue-box bg-white bg-opacity-95 p-3 rounded-xl shadow-xl border-2 border-gray-300 max-w-md w-[92%] pointer-events-auto">+
-                   <p class="text-gray-800 font-bold"><span class="${color}">${speakerName}:</span> ${text}</p>+
-                   ${isEnd?'<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>':''}+
-                   </div>;
+      const html = `
+        <div class="dialogue-box bg-white bg-opacity-95 p-3 rounded-xl shadow-xl border-2 border-gray-300 max-w-md w-[92%] pointer-events-auto">
+          <p class="text-gray-800 font-bold"><span class="${color}">${speakerName}:</span> ${text}</p>
+          ${isEnd?'<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>':''}
+        </div>`;
       dialogueEl.innerHTML = html; dialogueTimeout = setTimeout(()=>{ dialogueEl.innerHTML=''; }, duration);
     }
 
@@ -537,7 +496,10 @@
       checkWin();
     }
 
-    function checkWin(){ const allFixed = glitches.filter(g=>g.id!=='ball').every(g=>g.fixed) && glitches.find(g=>g.id==='ball')?.fixed; if(allFixed) showDialogue('やった！全部のバグを直したぞ！これでみんな安心だ！', 4800, 'ロセツ', true); }
+    function checkWin(){
+      const allFixed = glitches.filter(g=>g.id!=='ball').every(g=>g.fixed) && (glitches.find(g=>g.id==='ball')?.fixed);
+      if(allFixed) showDialogue('やった！全部のバグを直したぞ！これでみんな安心だ！', 4800, 'ロセツ', true);
+    }
 
     // ===== Loop =====
     function frameBegin(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(-camera.x,-camera.y); }
@@ -551,6 +513,7 @@
 
     // ===== Boot =====
     window.addEventListener('resize', layoutCanvas);
+    window.addEventListener('load', layoutCanvas);
     document.fonts && document.fonts.ready.then(layoutCanvas);
   </script>
 </body>
