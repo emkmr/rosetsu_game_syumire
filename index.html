@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+  <link rel="manifest" href="manifest.webmanifest">
   <!-- ホーム画面アイコン -->
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="apple-touch-icon" href="icons/icon.png">
@@ -552,6 +553,12 @@
     // ===== Boot =====
     window.addEventListener('resize', layoutCanvas);
     document.fonts && document.fonts.ready.then(layoutCanvas);
-  </script>
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js')
+    .then(() => console.log('Service Worker Registered'));
+}
+</script>
 </body>
 </html>
