@@ -303,7 +303,7 @@
       const bx = clamp(player.x + Math.cos(ang)*R, TILE_SIZE, world.w - TILE_SIZE*2);
       const by = clamp(player.y + Math.sin(ang)*R, TILE_SIZE, world.h - TILE_SIZE*2);
       ball.x=bx; ball.y=by; ball.state='telegraph'; ball.timer=900; ball.immune=900; ball.vx=0; ball.vy=0; ball.fixed=false;
-      showDialogue('？？？: なにかが現れた…', 1200, 'システム');
+      showDialogue('？？？: なにかが現れた…！', 1200, 'システム');
     }
 
     function updateBall(dt){
