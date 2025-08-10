@@ -167,7 +167,7 @@
     // "波動バグ"（音の波アトラクション）とフラッシュ演出
     const anomalies = []; // {x,y,age,life,maxR,hit:false,rings:3}
     let anomalyTimer = 0; // 次のスポーンまでの残りms
-    const flash = { t:0, dur:0 }; // t>0 の間、真ピンクで覆う
+    const flash = { t:0, dur:0, stars:[], cb:null }; // t>0 の間、真ピンクで覆う
     let inputLockedUntil = 0; // フラッシュ中は移動をロック
 
     // タップ移動コントロール（画面タッチ方向へ移動）
@@ -431,20 +431,55 @@
       ctx.restore();
     }
     function triggerFlash(){
-      flash.t = flash.dur = 280; // 0.28s
-      inputLockedUntil = performance.now() + 320; // 入力ロック
-      showDialogue('なんだ！？これは！！！？', 900, 'ロセツ');
+      // ピンク宇宙フラッシュ：少し長め & 星を発生
+      flash.dur = 1200; // ms
+      flash.t   = flash.dur;
+      // 入力ロックはフラッシュが終わるまで
+      inputLockedUntil = performance.now() + flash.dur + 40;
+      // スクリーン座標で星を生成（密度は画面サイズ依存）
+      const area = canvas.width * canvas.height;
+      const count = Math.max(80, Math.min(220, Math.floor(area / 8000)));
+      flash.stars = Array.from({length: count}, () => ({
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height,
+        r: 0.6 + Math.random()*1.8,
+        tw: Math.random()*Math.PI*2 // twinkle phase
+      }));
+      // 終了時のセリフ
+      flash.cb = () => {
+        showDialogue('今のは、、、宇宙に見えた、、、ピンクの空に星。なんなんだ、、、、まぼろし？？', 3200, 'ロセツ');
+      };
     }
     function drawFlashOverlay(dt){
       if(flash.t<=0) return;
       flash.t -= dt;
-      const k = Math.max(0, flash.t/flash.dur);
+      const k = Math.max(0, flash.t/flash.dur); // 1→0
+      // 画面全体（スクリーン座標）にピンク宇宙を描画
       ctx.save();
-      ctx.setTransform(1,0,0,1,0,0); // 画面全体に描画
-      ctx.globalAlpha = 0.85 * (0.3 + 0.7*k);
-      ctx.fillStyle = '#ff00aa';
+      ctx.setTransform(1,0,0,1,0,0);
+      // 背景ピンク（少しフェードアウト）
+      ctx.globalAlpha = 0.92 * (0.4 + 0.6*k);
+      ctx.fillStyle = '#ff0099';
       ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      // 星（白〜淡ピンク）、ゆっくり上方向へ流れ＆チカチカ
+      const tnow = performance.now();
+      ctx.globalAlpha = 1.0;
+      for(const s of flash.stars){
+        const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw); // 0.2 振幅
+        const y  = s.y - (1.2 * (1-k)); // 終盤ほど少し上に流れる
+        ctx.beginPath();
+        ctx.arc(s.x, y, s.r*tw, 0, Math.PI*2);
+        // 交互に白系/ピンク系
+        ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)';
+        ctx.fill();
+      }
       ctx.restore();
+
+      // フラッシュ終了時のコールバック（1回だけ）
+      if(flash.t<=0 && typeof flash.cb === 'function'){
+        const cb = flash.cb; flash.cb = null; cb();
+      }
     }
 
     // ===== Interact / Dialogue =====
