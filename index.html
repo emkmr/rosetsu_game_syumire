@@ -38,6 +38,9 @@
     @keyframes slide-up { from{ transform: translateY(100%); opacity:0;} to{ transform: translateY(0); opacity:1;} }
     :root { --safe-bottom: env(safe-area-inset-bottom); }
     #controls { padding-bottom: calc(var(--safe-bottom,0) + .25rem); }
+    #btn-up, #btn-down, #btn-left, #btn-right { display:none; }
+    * { -webkit-user-select: none; user-select: none; }
+    #gameCanvas { touch-action: none; }
   </style>
 </head>
 <body>
@@ -156,6 +159,9 @@
     const player = { x: START_TX*TILE_SIZE, y: START_TY*TILE_SIZE, size:TILE_SIZE*0.9, speed:4.2, isMoving:false };
     const keys = {}; let gameStarted=false; let tetsujiQuestAccepted=false; let dialogueTimeout;
 
+    // タップ移動コントロール（画面タッチ方向へ移動）
+    const touch = { active:false, wx:0, wy:0 };
+
     const npcs = [
       { id:'komaru', type:5, x:(START_TX+2)*TILE_SIZE, y:(START_TY)*TILE_SIZE, size:TILE_SIZE*0.9, speed:1.2, vx:0, vy:0, homeX:null, homeY:null, wander:0, radius:TILE_SIZE*6, dialogue:'ロセちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！' },
       { id:'tetsuji', type:6, x:(START_TX+5)*TILE_SIZE, y:(START_TY-2)*TILE_SIZE, size:TILE_SIZE,   speed:1.0, vx:0, vy:0, homeX:null, homeY:null, wander:0, radius:TILE_SIZE*6, dialogue:'うぅ…首輪についてたももちゃんにもらった大事な野球ボールが、変な光と共になくなっちゃったんだ…' }
@@ -183,15 +189,22 @@
 
     // ===== Input =====
     function setupControls(){
-      const press=k=>{ keys[k]=true; if(!gameStarted) gameStarted=true; };
-      const release=k=>{ keys[k]=false; };
-      [['btn-up','ArrowUp'],['btn-down','ArrowDown'],['btn-left','ArrowLeft'],['btn-right','ArrowRight']].forEach(([id,key])=>{
-        const b=document.getElementById(id); b.addEventListener('pointerdown',e=>{e.preventDefault(); press(key);}); b.addEventListener('pointerup',e=>{e.preventDefault(); release(key);}); b.addEventListener('pointerleave',e=>{e.preventDefault(); release(key);});
-      });
+      // TALK/CHECK は残す
       document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
+      // 物理キーボード併用可（開発時）
       window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }});
       window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
-      canvas.addEventListener('touchstart', ()=>{ if(!gameStarted){ gameStarted=true; showDialogue('お外の様子が変だ…パトロールしなきゃ！', 3000); } }, { once:false });
+
+      // Pointer-based move: 画面を押した方向へ進む（ドラッグで方向変更、指を離すと停止）
+      const toWorld = (e)=>{ const r=canvas.getBoundingClientRect(); const sx=(e.clientX - r.left)*(canvas.width/r.width); const sy=(e.clientY - r.top)*(canvas.height/r.height); return { wx: sx/camera.dpr + camera.x, wy: sy/camera.dpr + camera.y };
+      const start = (e)=>{ e.preventDefault(); const p=toWorld(e); touch.active=true; touch.wx=p.wx; touch.wy=p.wy; if(!gameStarted) gameStarted=true; };
+      const move  = (e)=>{ if(!touch.active) return; e.preventDefault(); const p=toWorld(e); touch.wx=p.wx; touch.wy=p.wy; };
+      const end   = ()=>{ touch.active=false; };
+      canvas.addEventListener('pointerdown', start);
+      canvas.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', end);
+      window.addEventListener('pointercancel', end);
+    };
     }
 
     // ===== Utilities =====
@@ -285,7 +298,24 @@
       if(!isBlocked('player', nx, player.y, player.size)) player.x=nx;
       if(!isBlocked('player', player.x, ny, player.size)) player.y=ny;
     }
-    function updatePlayer(){ player.isMoving=false; let dx=0,dy=0; if(keys.ArrowUp) dy-=player.speed; if(keys.ArrowDown) dy+=player.speed; if(keys.ArrowLeft) dx-=player.speed; if(keys.ArrowRight) dx+=player.speed; if(dx||dy) player.isMoving=true; movePlayer(dx,dy); }
+    function updatePlayer(){
+      player.isMoving=false; let dx=0, dy=0;
+      // 物理キー（開発向け）
+      if(keys.ArrowUp) dy -= player.speed;
+      if(keys.ArrowDown) dy += player.speed;
+      if(keys.ArrowLeft) dx -= player.speed;
+      if(keys.ArrowRight) dx += player.speed;
+
+      // タップ移動が有効ならそちらを優先
+      if(touch.active){
+        const cx = player.x + player.size/2, cy = player.y + player.size/2;
+        const vx = touch.wx - cx, vy = touch.wy - cy;
+        const d = Math.hypot(vx, vy);
+        if(d > 6){ dx = (vx/d) * player.speed; dy = (vy/d) * player.speed; }
+      }
+      if(dx||dy) player.isMoving=true;
+      movePlayer(dx, dy);
+    }
 
     // 自動歩行（ソフトリード＋たまに方向転換）
     function updateNPCs(dt){
@@ -303,7 +333,7 @@
       const bx = clamp(player.x + Math.cos(ang)*R, TILE_SIZE, world.w - TILE_SIZE*2);
       const by = clamp(player.y + Math.sin(ang)*R, TILE_SIZE, world.h - TILE_SIZE*2);
       ball.x=bx; ball.y=by; ball.state='telegraph'; ball.timer=900; ball.immune=900; ball.vx=0; ball.vy=0; ball.fixed=false;
-      showDialogue('？？？: なにかが現れた…！', 1200, 'システム');
+      showDialogue('？？？: なにかが現れた…', 1200, 'システム');
     }
 
     function updateBall(dt){
@@ -372,9 +402,10 @@
 
     // ===== Loop =====
     function frameBegin(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(-camera.x,-camera.y); }
+    function drawTouchIndicator(){ if(!touch.active) return; ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(touch.wx, touch.wy, 12, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
     function frameEnd(){ ctx.restore(); }
     let last = performance.now();
-    function gameLoop(now){ const dt=Math.min(50, now-last); last=now; updatePlayer(); updateNPCs(dt); if(tetsujiQuestAccepted) updateBall(dt); updateGlitches(); clampCamera(player.x+player.size/2, player.y+player.size/2); frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawRosetsu(player); frameEnd(); requestAnimationFrame(gameLoop); }
+    function gameLoop(now){ const dt=Math.min(50, now-last); last=now; updatePlayer(); updateNPCs(dt); if(tetsujiQuestAccepted) updateBall(dt); updateGlitches(); clampCamera(player.x+player.size/2, player.y+player.size/2); frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawRosetsu(player); drawTouchIndicator(); frameEnd(); requestAnimationFrame(gameLoop); }
 
     function startGame(){ setupControls(); showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム'); clampCamera(player.x, player.y); requestAnimationFrame(gameLoop); }
 
