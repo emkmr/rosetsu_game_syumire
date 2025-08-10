@@ -164,6 +164,12 @@
     const player = { x: START_TX*TILE_SIZE, y: START_TY*TILE_SIZE, size:TILE_SIZE*0.9, speed:4.2, isMoving:false };
     const keys = {}; let gameStarted=false; let tetsujiQuestAccepted=false; let dialogueTimeout;
 
+    // "波動バグ"（音の波アトラクション）とフラッシュ演出
+    const anomalies = []; // {x,y,age,life,maxR,hit:false,rings:3}
+    let anomalyTimer = 0; // 次のスポーンまでの残りms
+    const flash = { t:0, dur:0 }; // t>0 の間、真ピンクで覆う
+    let inputLockedUntil = 0; // フラッシュ中は移動をロック
+
     // タップ移動コントロール（画面タッチ方向へ移動）
     const touch = { active:false, wx:0, wy:0 };
 
@@ -208,7 +214,21 @@
         return { wx: sx / camera.dpr + camera.x, wy: sy / camera.dpr + camera.y };
       };
 
-      const start = (e) => { e.preventDefault(); const p=toWorld(e); touch.active=true; touch.wx=p.wx; touch.wy=p.wy; if(!gameStarted) gameStarted=true; };
+      const tryAnomalyHit = (p)=>{
+        // どれかのリングの縁に触れたらヒット
+        for(const a of anomalies){
+          if(a.hit) continue;
+          for(let i=0;i<(a.rings||1);i++){
+            const phase = (a.age/a.life + i/(a.rings||1)) % 1;
+            const ring = a.maxR * phase;
+            const d = Math.hypot(p.wx-a.x, p.wy-a.y);
+            if(Math.abs(d - ring) < 18){ a.hit=true; triggerFlash(); return true; }
+          }
+        }
+        return false;
+      };
+
+      const start = (e) => { e.preventDefault(); const p=toWorld(e); if(tryAnomalyHit(p)) { touch.active=false; return; } touch.active=true; touch.wx=p.wx; touch.wy=p.wy; if(!gameStarted) gameStarted=true; };
       const move  = (e) => { if(!touch.active) return; e.preventDefault(); const p=toWorld(e); touch.wx=p.wx; touch.wy=p.wy; };
       const end   = () => { touch.active=false; };
 
@@ -310,22 +330,20 @@
       if(!isBlocked('player', player.x, ny, player.size)) player.y=ny;
     }
     function updatePlayer(){
-      player.isMoving=false; let dx=0, dy=0;
+      player.isMoving=false; let dx=0, dy=0; const now=performance.now();
+      if(now < inputLockedUntil){ movePlayer(0,0); return; }
       // 物理キー（開発向け）
       if(keys.ArrowUp) dy -= player.speed;
       if(keys.ArrowDown) dy += player.speed;
       if(keys.ArrowLeft) dx -= player.speed;
       if(keys.ArrowRight) dx += player.speed;
-
-      // タップ移動が有効ならそちらを優先
+      // タップ移動
       if(touch.active){
         const cx = player.x + player.size/2, cy = player.y + player.size/2;
-        const vx = touch.wx - cx, vy = touch.wy - cy;
-        const d = Math.hypot(vx, vy);
+        const vx = touch.wx - cx, vy = touch.wy - cy; const d = Math.hypot(vx, vy);
         if(d > 6){ dx = (vx/d) * player.speed; dy = (vy/d) * player.speed; }
       }
-      if(dx||dy) player.isMoving=true;
-      movePlayer(dx, dy);
+      if(dx||dy) player.isMoving=true; movePlayer(dx, dy);
     }
 
     // 自動歩行（ソフトリード＋たまに方向転換）
@@ -372,6 +390,62 @@
         if(g.id==='normal' && !g.fixed){ const d=dist(player.x+player.size/2,player.y+player.size/2,g.x+TILE_SIZE/2,g.y+TILE_SIZE/2); if(d<TILE_SIZE){ g.fixed=true; handleGlitchFix('normal'); } }
       });
     }
+    
+    // ===== Anomaly (音の波動) =====
+    function spawnAnomaly(){
+      const margin = TILE_SIZE*3;
+      const x = Math.random()*(world.w - margin*2) + margin;
+      const y = Math.random()*(world.h - margin*2) + margin;
+      anomalies.push({ x, y, age:0, life:6000, maxR:TILE_SIZE*9, hit:false, rings:3 });
+    }
+    function updateAnomalies(dt){
+      anomalyTimer -= dt;
+      if(anomalyTimer<=0){ spawnAnomaly(); anomalyTimer = 3000 + Math.random()*3000; }
+      for(let i=anomalies.length-1;i>=0;i--){
+        const a = anomalies[i];
+        a.age += dt;
+        if(a.age > a.life) anomalies.splice(i,1);
+      }
+    }
+    function drawAnomalies(){
+      ctx.save();
+      anomalies.forEach(a=>{
+        // 複数リング（rings本）：各リングは位相オフセットで循環
+        for(let i=0;i<a.rings;i++){
+          const phase = (a.age/a.life + i/a.rings) % 1; // 0..1
+          const r = a.maxR * phase;
+          const alpha = 0.75 * (1 - phase);
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, r, 0, Math.PI*2);
+          ctx.strokeStyle = `rgba(255,105,180,${alpha})`;
+          ctx.lineWidth = 4;
+          ctx.stroke();
+        }
+        // 中心の“音源”
+        const pulse = 1 + 0.25 * Math.sin(a.age/120);
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 6*pulse, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,105,180,0.85)';
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+    function triggerFlash(){
+      flash.t = flash.dur = 280; // 0.28s
+      inputLockedUntil = performance.now() + 320; // 入力ロック
+      showDialogue('なんだ！？これは！！！？', 900, 'ロセツ');
+    }
+    function drawFlashOverlay(dt){
+      if(flash.t<=0) return;
+      flash.t -= dt;
+      const k = Math.max(0, flash.t/flash.dur);
+      ctx.save();
+      ctx.setTransform(1,0,0,1,0,0); // 画面全体に描画
+      ctx.globalAlpha = 0.85 * (0.3 + 0.7*k);
+      ctx.fillStyle = '#ff00aa';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.restore();
+    }
 
     // ===== Interact / Dialogue =====
     function showDialogue(text, duration=3000, speaker='ロセツ', isEnd=false){
@@ -416,7 +490,8 @@
     function drawTouchIndicator(){ if(!touch.active) return; ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(touch.wx, touch.wy, 12, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
     function frameEnd(){ ctx.restore(); }
     let last = performance.now();
-    function gameLoop(now){ const dt=Math.min(50, now-last); last=now; updatePlayer(); updateNPCs(dt); if(tetsujiQuestAccepted) updateBall(dt); updateGlitches(); clampCamera(player.x+player.size/2, player.y+player.size/2); frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawRosetsu(player); drawTouchIndicator(); frameEnd(); requestAnimationFrame(gameLoop); }
+    function gameLoop(now){ const dt=Math.min(50, now-last); last=now; updatePlayer(); updateNPCs(dt); if(tetsujiQuestAccepted) updateBall(dt); updateGlitches(); updateAnomalies(dt); clampCamera(player.x+player.size/2, player.y+player.size/2); frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawAnomalies(); drawRosetsu(player); drawTouchIndicator(); frameEnd();
+      drawFlashOverlay(dt); requestAnimationFrame(gameLoop); }
 
     function startGame(){ setupControls(); showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム'); clampCamera(player.x, player.y); requestAnimationFrame(gameLoop); }
 
