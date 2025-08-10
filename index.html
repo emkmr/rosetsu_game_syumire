@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Rosetsu and the Simulated World — Wide Stage</title>
+  <title>Rosetsu and the Simulated World — ワイド＋自動歩行＋見えるボール</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet" />
   <style>
-    body { font-family: 'Noto Sans JP', sans-serif; background:#000; margin:0; }
-    /* Opening */
+    body { font-family: 'Noto Sans JP', sans-serif; background:#000; margin:0; overflow:hidden; }
+
+    /* --- Opening Styles (元データを維持) --- */
     #openingSequence { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
     .stars { position:absolute; inset:0; background:transparent; }
     .stars-small { background-image: radial-gradient(1px 1px at 20px 30px, #eee, rgba(0,0,0,0)), radial-gradient(1px 1px at 40px 70px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 50px 160px, #ddd, rgba(0,0,0,0)), radial-gradient(1px 1px at 90px 40px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 130px 80px, #fff, rgba(0,0,0,0)), radial-gradient(1px 1px at 160px 120px, #ddd, rgba(0,0,0,0)); background-size: 200px 200px; animation: zoom 25s infinite; }
@@ -28,20 +29,19 @@
     @media (min-width:768px){ .initial-text{font-size:3em;} }
     @keyframes initialFade { 0%{opacity:0;} 20%{opacity:1;} 80%{opacity:1;} 100%{opacity:0;} }
 
-    /* Game */
+    /* --- Game Styles --- */
     .game-body { background:#f0f0f0; }
     #gameCanvas { display:block; background:#eaeaea; border:2px solid #333; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,.1); image-rendering: pixelated; width:100%; height:auto; }
     .control-btn { transition: all .1s ease-in-out; user-select:none; }
     .control-btn:active { transform: scale(.92); }
-    .dialogue-box { animation: slide-up .35s ease-out forwards; }
+    .dialogue-box { animation: slide-up .28s ease-out forwards; }
     @keyframes slide-up { from{ transform: translateY(100%); opacity:0;} to{ transform: translateY(0); opacity:1;} }
-    /* iPhoneのセーフエリア対応 */
     :root { --safe-bottom: env(safe-area-inset-bottom); }
     #controls { padding-bottom: calc(var(--safe-bottom,0) + .25rem); }
   </style>
 </head>
 <body>
-  <!-- Opening -->
+  <!-- Opening Sequence (クリック/タップでスキップ可能) -->
   <div id="openingSequence">
     <div id="starsContainer" style="display:none;">
       <div class="stars stars-small"></div>
@@ -74,13 +74,13 @@
     </div>
   </div>
 
-  <!-- Game -->
+  <!-- Main Game -->
   <div id="mainGame" style="display:none;" class="flex flex-col items-center justify-center min-h-screen p-4">
     <div id="game-container" class="w-full max-w-2xl mx-auto">
       <h1 class="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-3">Rosetsu and the Simulated World</h1>
       <canvas id="gameCanvas"></canvas>
     </div>
-    <div id="dialogue-container" class="fixed bottom-24 left-0 right-0 p-3 flex justify-center z-10 pointer-events-none"></div>
+    <div id="dialogue-container" class="fixed left-0 right-0 p-3 flex justify-center z-30 pointer-events-none"></div>
     <div id="controls" class="fixed bottom-0 left-0 right-0 grid grid-cols-3 gap-2 w-full max-w-sm mx-auto p-3 z-20">
       <div></div>
       <button id="btn-up" class="control-btn bg-gray-700 text-white p-4 rounded-2xl shadow-md">↑</button>
@@ -93,31 +93,7 @@
   </div>
 
   <script type="module">
-    // ===== Layout helpers (for iPhone) =====
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const controlsEl = document.getElementById('controls');
-    const dialogueEl = document.getElementById('dialogue-container');
-
-    function layoutCanvas() {
-      // Available height = viewport - controls - margins
-      const rect = controlsEl.getBoundingClientRect();
-      const controlsHeight = Math.max(rect.height, 160);
-      const desiredHeight = Math.max(260, window.innerHeight - controlsHeight - 120);
-      const desiredWidth = Math.min(window.innerWidth, 820); // keep text readable on iPhone
-      const dpr = Math.min(window.devicePixelRatio || 1, 2); // cap DPR for perf
-
-      canvas.style.width = desiredWidth + 'px';
-      canvas.style.height = desiredHeight + 'px';
-      canvas.width = Math.floor(desiredWidth * dpr);
-      canvas.height = Math.floor(desiredHeight * dpr);
-
-      camera.w = desiredWidth; // logical size (pre-scale)
-      camera.h = desiredHeight;
-      camera.dpr = dpr;
-    }
-
-    // ===== Opening sequence wiring =====
+    // ===== DOM refs =====
     const openingSequence = document.getElementById('openingSequence');
     const initialText = document.getElementById('initialText');
     const gameTitleOpening = document.getElementById('gameTitleOpening');
@@ -126,146 +102,173 @@
     const mainGame = document.getElementById('mainGame');
     const starsContainer = document.getElementById('starsContainer');
 
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const controlsEl = document.getElementById('controls');
+    const dialogueEl = document.getElementById('dialogue-container');
+
+    // ===== Layout (iPhone考慮) =====
+    const camera = { x:0, y:0, w:0, h:0, dpr:1 };
+    function layoutCanvas(){
+      const rect = controlsEl.getBoundingClientRect();
+      const controlsHeight = Math.max(rect.height, 160);
+      const desiredHeight = Math.max(260, window.innerHeight - controlsHeight - 120);
+      const desiredWidth = Math.min(window.innerWidth, 820);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.style.width = desiredWidth + 'px';
+      canvas.style.height = desiredHeight + 'px';
+      canvas.width = Math.floor(desiredWidth * dpr);
+      canvas.height = Math.floor(desiredHeight * dpr);
+      camera.w = desiredWidth; camera.h = desiredHeight; camera.dpr = dpr;
+      dialogueEl.style.bottom = (controlsHeight + 12) + 'px';
+    }
+
+    // ===== Opening control =====
     let openingSkipped = false;
     const skipOpening = () => {
-      if (openingSkipped) return;
-      openingSkipped = true;
+      if (openingSkipped) return; openingSkipped = true;
       openingSequence.style.display = 'none';
       document.body.classList.add('game-body');
       mainGame.style.display = 'flex';
       layoutCanvas();
       startGame();
     };
-
     openingSequence.addEventListener('click', skipOpening);
-    openingSequence.addEventListener('touchstart', skipOpening);
-    initialText.addEventListener('animationend', () => { if (openingSkipped) return; initialText.style.display = 'none'; starsContainer.style.display='block'; gameTitleOpening.style.display='block'; });
+    openingSequence.addEventListener('touchstart', skipOpening, {passive:true});
+    initialText.addEventListener('animationend', () => { if (openingSkipped) return; initialText.style.display='none'; starsContainer.style.display='block'; gameTitleOpening.style.display='block'; });
     gameTitleOpening.addEventListener('animationend', () => { if (openingSkipped) return; gameTitleOpening.style.display='none'; perspectiveContainer.style.display='block'; });
     crawlContainer.addEventListener('animationend', () => { if (openingSkipped) return; skipOpening(); });
 
-    // ===== World / Camera =====
-    const TILE_SIZE = 48; // visible tile size (logical)
-    const WORLD_COLS = 60; // WIDE STAGE
+    // ===== World =====
+    const TILE_SIZE = 48;
+    const WORLD_COLS = 60;
     const WORLD_ROWS = 40;
-
-    // Generate a world with borders and some obstacles
     const map = Array.from({ length: WORLD_ROWS }, (_, y) => (
-      Array.from({ length: WORLD_COLS }, (_, x) => {
-        if (y === 0 || y === WORLD_ROWS-1 || x === 0 || x === WORLD_COLS-1) return 1; // wall
-        return 0; // grass
-      })
+      Array.from({ length: WORLD_COLS }, (_, x) => (y===0||y===WORLD_ROWS-1||x===0||x===WORLD_COLS-1)?1:0)
     ));
+    function addBlock(x,y,w,h,id){ for(let j=0;j<h;j++){ for(let i=0;i<w;i++){ map[y+j][x+i]=id; }}}
+    addBlock(8,6,6,3,3); addBlock(16,12,4,7,4); addBlock(27,9,5,5,3);
+    addBlock(40,20,8,4,4); addBlock(45,30,5,5,3); addBlock(12,28,7,4,4);
 
-    // add some patches of trees(3) and bush(4) as soft walls
-    function addBlock(x, y, w, h, id){ for(let j=0;j<h;j++){ for(let i=0;i<w;i++){ map[y+j][x+i]=id; }}}
-    addBlock(8, 6, 6, 3, 3); addBlock(16, 12, 4, 7, 4); addBlock(27, 9, 5, 5, 3);
-    addBlock(40, 20, 8, 4, 4); addBlock(45, 30, 5, 5, 3); addBlock(12, 28, 7, 4, 4);
+    const START_TX = 4, START_TY = WORLD_ROWS - 6;
 
-    // NPC(5,6) & glitches(7=normal,8=ball)
-    const entities = {
-      npcs: [
-        {tile:[10, 10], id:'komaru', type:5, dialogue:'ロセちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！'},
-        {tile:[50, 28], id:'tetsuji', type:6, dialogue:'うぅ…首輪についてたももちゃんにもらった大事な野球ボールが、変な光と共になくなっちゃったんだ…'}
-      ],
-      glitches: [
-        {tile:[25, 8], id:'normal', fixed:false, size:TILE_SIZE},
-        {tile:[33, 18], id:'normal', fixed:false, size:TILE_SIZE},
-        {tile:[44, 26], id:'ball', fixed:false, size:TILE_SIZE, vx:0, vy:0, flicker:0}
-      ]
-    };
+    // ===== State =====
+    const player = { x: START_TX*TILE_SIZE, y: START_TY*TILE_SIZE, size:TILE_SIZE*0.9, speed:4.2, isMoving:false };
+    const keys = {}; let gameStarted=false; let tetsujiQuestAccepted=false; let dialogueTimeout;
 
-    entities.npcs.forEach(n=>{ const [tx,ty]=n.tile; map[ty][tx]=n.type; });
+    const npcs = [
+      { id:'komaru', type:5, x:(START_TX+2)*TILE_SIZE, y:(START_TY)*TILE_SIZE, size:TILE_SIZE*0.9, speed:1.2, vx:0, vy:0, homeX:null, homeY:null, wander:0, radius:TILE_SIZE*6, dialogue:'ロセちゃん。この世界のバグは、タフガイならすぐに見つけられるはず！' },
+      { id:'tetsuji', type:6, x:(START_TX+5)*TILE_SIZE, y:(START_TY-2)*TILE_SIZE, size:TILE_SIZE,   speed:1.0, vx:0, vy:0, homeX:null, homeY:null, wander:0, radius:TILE_SIZE*6, dialogue:'うぅ…首輪についてたももちゃんにもらった大事な野球ボールが、変な光と共になくなっちゃったんだ…' }
+    ];
+    npcs.forEach(n=>{ n.homeX=n.x; n.homeY=n.y; });
 
-    const world = { w: WORLD_COLS * TILE_SIZE, h: WORLD_ROWS * TILE_SIZE };
+    const glitches = [
+      { id:'normal', x:(START_TX+8)*TILE_SIZE, y:(START_TY-4)*TILE_SIZE, size:TILE_SIZE, fixed:false },
+      { id:'normal', x:33*TILE_SIZE, y:18*TILE_SIZE, size:TILE_SIZE, fixed:false },
+      // ball はクエスト受注後に近接出現（見えるが即取れない）
+      { id:'ball', x:44*TILE_SIZE, y:26*TILE_SIZE, size:TILE_SIZE, fixed:false, vx:0, vy:0, flicker:0, state:'idle', timer:0, immune:0 }
+    ];
 
-    const camera = { x: 0, y: 0, w: 0, h: 0, dpr: 1 };
-    function clampCameraToPlayer(px, py){
-      const marginX = camera.w * 0.35; // keep player off-center for better lookahead
-      const marginY = camera.h * 0.35;
-      let targetX = px - camera.w/2; let targetY = py - camera.h/2;
-      // dead-zone smoothing
-      if (px < camera.x + marginX) targetX = px - marginX;
-      if (px > camera.x + camera.w - marginX) targetX = px + marginX - camera.w;
-      if (py < camera.y + marginY) targetY = py - marginY;
-      if (py > camera.y + camera.h - marginY) targetY = py + marginY - camera.h;
-      camera.x = Math.max(0, Math.min(world.w - camera.w, targetX));
-      camera.y = Math.max(0, Math.min(world.h - camera.h, targetY));
+    // MapにNPCをソリッド配置
+    npcs.forEach(n=>{ const tx=Math.floor(n.x/TILE_SIZE), ty=Math.floor(n.y/TILE_SIZE); map[ty][tx]=n.type; });
+
+    // ===== Camera =====
+    const world = { w: WORLD_COLS*TILE_SIZE, h: WORLD_ROWS*TILE_SIZE };
+    function clampCamera(px,py){
+      const mx = camera.w*0.35, my = camera.h*0.35; let tx = px - camera.w/2, ty = py - camera.h/2;
+      if (px < camera.x + mx) tx = px - mx; if (px > camera.x + camera.w - mx) tx = px + mx - camera.w;
+      if (py < camera.y + my) ty = py - my; if (py > camera.y + camera.h - my) ty = py + my - camera.h;
+      camera.x = Math.max(0, Math.min(world.w - camera.w, tx)); camera.y = Math.max(0, Math.min(world.h - camera.h, ty));
     }
 
-    // ===== Player/State =====
-    const player = { x: TILE_SIZE * 2, y: TILE_SIZE * (WORLD_ROWS-3), size: TILE_SIZE * 0.9, speed: 4.2, isMoving:false };
-    const keys = {};
-    let gameStarted = false; let tetsujiQuestAccepted = false; let dialogueTimeout;
+    // ===== Input =====
+    function setupControls(){
+      const press=k=>{ keys[k]=true; if(!gameStarted) gameStarted=true; };
+      const release=k=>{ keys[k]=false; };
+      [['btn-up','ArrowUp'],['btn-down','ArrowDown'],['btn-left','ArrowLeft'],['btn-right','ArrowRight']].forEach(([id,key])=>{
+        const b=document.getElementById(id); b.addEventListener('pointerdown',e=>{e.preventDefault(); press(key);}); b.addEventListener('pointerup',e=>{e.preventDefault(); release(key);}); b.addEventListener('pointerleave',e=>{e.preventDefault(); release(key);});
+      });
+      document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
+      window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }});
+      window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
+      canvas.addEventListener('touchstart', ()=>{ if(!gameStarted){ gameStarted=true; showDialogue('お外の様子が変だ…パトロールしなきゃ！', 3000); } }, { once:false });
+    }
 
-    const npcs = entities.npcs.map(n=>({ x:n.tile[0]*TILE_SIZE, y:n.tile[1]*TILE_SIZE, ...n }));
-    const glitches = entities.glitches.map(g=>({ x:g.tile[0]*TILE_SIZE, y:g.tile[1]*TILE_SIZE, ...g }));
+    // ===== Utilities =====
+    const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+    const dist=(ax,ay,bx,by)=>Math.hypot(ax-bx, ay-by);
 
-    // ===== Drawing (with camera) =====
-    function beginFrame(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(-camera.x, -camera.y); }
-    function endFrame(){ ctx.restore(); }
-
-    function drawMap(){
-      const startCol = Math.max(0, Math.floor(camera.x / TILE_SIZE)-1);
-      const endCol = Math.min(WORLD_COLS-1, Math.ceil((camera.x + camera.w) / TILE_SIZE)+1);
-      const startRow = Math.max(0, Math.floor(camera.y / TILE_SIZE)-1);
-      const endRow = Math.min(WORLD_ROWS-1, Math.ceil((camera.y + camera.h) / TILE_SIZE)+1);
-      for(let y=startRow; y<=endRow; y++){
-        for(let x=startCol; x<=endCol; x++){
-          const id = map[y][x];
-          let color = '#a3bf8f';
-          if (id===1) color='#7a6855'; else if (id===3) color='#8aab79'; else if (id===4) color='#6b8e23';
-          ctx.fillStyle = color; ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        }
+    function isBlocked(actor, x, y, size){
+      const margin=2;
+      const corners=[
+        {x:x+margin, y:y+margin},
+        {x:x+size-margin, y:y+margin},
+        {x:x+margin, y:y+size-margin},
+        {x:x+size-margin, y:y+size-margin}
+      ];
+      for(const c of corners){
+        const tx=Math.floor(c.x/TILE_SIZE), ty=Math.floor(c.y/TILE_SIZE);
+        const id=map[ty]?.[tx];
+        // 共通の衝突: 壁(1)・障害物(3/4)
+        if(id===1||id===3||id===4) return true;
+        // プレイヤーのみNPCタイル(5/6)にぶつかる
+        if(actor==='player' && (id===5||id===6)) return true;
       }
+      return false;
     }
 
+    // ===== Draw (顔パーツを元どおり) =====
+    function drawMap(){
+      const sc=Math.max(0,Math.floor(camera.x/TILE_SIZE)-1), ec=Math.min(WORLD_COLS-1,Math.ceil((camera.x+camera.w)/TILE_SIZE)+1);
+      const sr=Math.max(0,Math.floor(camera.y/TILE_SIZE)-1), er=Math.min(WORLD_ROWS-1,Math.ceil((camera.y+camera.h)/TILE_SIZE)+1);
+      for(let y=sr;y<=er;y++) for(let x=sc;x<=ec;x++){ const id=map[y][x]; let color='#a3bf8f'; if(id===1) color='#7a6855'; else if(id===3) color='#8aab79'; else if(id===4) color='#6b8e23'; ctx.fillStyle=color; ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE); }
+    }
     function drawRosetsu(p){
-      ctx.save(); ctx.translate(p.x + p.size/2, p.y + p.size/2);
-      if (p.isMoving) ctx.translate(0, Math.sin(Date.now()/100)*2);
+      ctx.save(); ctx.translate(p.x+p.size/2, p.y+p.size/2); if(p.isMoving) ctx.translate(0, Math.sin(Date.now()/100)*2);
       ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(0, p.size*0.1, p.size*0.28, p.size*0.4, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(0, -p.size*0.2, p.size*0.35, p.size*0.25, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-p.size*0.2, -p.size*0.3); ctx.quadraticCurveTo(-p.size*0.4, -p.size*0.5, -p.size*0.3, -p.size*0.15); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(p.size*0.2, -p.size*0.3); ctx.quadraticCurveTo(p.size*0.4, -p.size*0.5, p.size*0.3, -p.size*0.15); ctx.fill(); ctx.stroke();
-      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*0.1, -p.size*0.2, 1.6, 0, Math.PI*2); ctx.arc(p.size*0.1, -p.size*0.2, 1.6, 0, Math.PI*2); ctx.arc(0, -p.size*0.15, 1.6, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle='#FF9800'; ctx.beginPath(); ctx.ellipse(0, p.size*0.15, p.size*0.05, p.size*0.12, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle='#FF7043'; ctx.beginPath(); ctx.moveTo(0, p.size*0.05); ctx.lineTo(-p.size*0.08, p.size*0.02); ctx.lineTo(p.size*0.08, p.size*0.02); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0,p.size*0.1,p.size*0.28,p.size*0.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0,-p.size*0.2,p.size*0.35,p.size*0.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(-p.size*0.4,-p.size*0.5,-p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(p.size*0.4,-p.size*0.5,p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*0.1,-p.size*0.2,1.6,0,Math.PI*2); ctx.arc(p.size*0.1,-p.size*0.2,1.6,0,Math.PI*2); ctx.arc(0,-p.size*0.15,1.6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#FF9800'; ctx.beginPath(); ctx.ellipse(0,p.size*0.15,p.size*0.05,p.size*0.12,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#FF7043'; ctx.beginPath(); ctx.moveTo(0,p.size*0.05); ctx.lineTo(-p.size*0.08,p.size*0.02); ctx.lineTo(p.size*0.08,p.size*0.02); ctx.closePath(); ctx.fill();
       ctx.restore();
     }
-
-    function drawKomaru(npc){
-      ctx.save(); ctx.translate(npc.x + TILE_SIZE/2, npc.y + TILE_SIZE/2); const p={size:TILE_SIZE*.9};
+    function drawKomaru(n){
+      ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE*.9};
       ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(0, p.size*.15, p.size*.28, p.size*.4, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(0, -p.size*.2, p.size*.35, p.size*.25, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-p.size*.2, -p.size*.3); ctx.quadraticCurveTo(-p.size*.4, -p.size*.45, -p.size*.35, -p.size*.15); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(p.size*.2, -p.size*.3); ctx.quadraticCurveTo(p.size*.4, -p.size*.45, p.size*.35, -p.size*.15); ctx.fill(); ctx.stroke();
-      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.12, -p.size*.2, 1.5, 0, Math.PI*2); ctx.arc(p.size*.12, -p.size*.2, 1.5, 0, Math.PI*2); ctx.arc(0, -p.size*.15, 1.5, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle='black'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-p.size*.1, -p.size*.1); ctx.quadraticCurveTo(0, -p.size*.07, p.size*.1, -p.size*.1); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0,p.size*.15,p.size*.28,p.size*.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0,-p.size*.2,p.size*.35,p.size*.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-p.size*.2,-p.size*.3); ctx.quadraticCurveTo(-p.size*.4,-p.size*.45,-p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.size*.2,-p.size*.3); ctx.quadraticCurveTo(p.size*.4,-p.size*.45,p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(0,-p.size*.15,1.5,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='black'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-p.size*.1,-p.size*.1); ctx.quadraticCurveTo(0,-p.size*.07,p.size*.1,-p.size*.1); ctx.stroke();
+      // ヒント
+      if(!tetsujiQuestAccepted && dist(player.x,player.y,n.x,n.y)<TILE_SIZE*3){ ctx.fillStyle='#ffcc00'; ctx.font='bold 18px sans-serif'; ctx.fillText('！', -4, -p.size*.8); }
       ctx.restore();
     }
-
-    function drawTetsuji(npc){
-      ctx.save(); ctx.translate(npc.x + TILE_SIZE/2, npc.y + TILE_SIZE/2); const p={size:TILE_SIZE};
+    function drawTetsuji(n){
+      ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE};
       ctx.fillStyle='#f5deb3'; ctx.strokeStyle='black'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(0, p.size*.25, p.size*.5, p.size*.3, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(0, -p.size*.1, p.size*.4, p.size*.28, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(-p.size*.35, -p.size*.1, p.size*.16, p.size*.14, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(p.size*.35, -p.size*.1, p.size*.16, p.size*.14, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle='#3d3532'; ctx.beginPath(); ctx.ellipse(0, 0, p.size*.25, p.size*.1, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.15, -p.size*.12, p.size*.05, 0, Math.PI*2); ctx.arc(p.size*.15, -p.size*.12, p.size*.05, 0, Math.PI*2); ctx.arc(0, p.size*.02, p.size*.04, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0,p.size*.25,p.size*.5,p.size*.3,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0,-p.size*.1,p.size*.4,p.size*.28,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#3d3532'; ctx.beginPath(); ctx.ellipse(0,0,p.size*.25,p.size*.1,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(0,p.size*.02,p.size*.04,0,Math.PI*2); ctx.fill();
+      if(!tetsujiQuestAccepted){ ctx.fillStyle='#ffcc00'; ctx.font='bold 18px sans-serif'; ctx.fillText('！', -4, -p.size*.8); }
       ctx.restore();
     }
-
-    function drawNPCs(){ npcs.forEach(n=>{ if(n.id==='komaru') drawKomaru(n); else if(n.id==='tetsuji') drawTetsuji(n); }); }
-
+    function drawNPCs(){ npcs.forEach(n=>{ if(n.id==='komaru') drawKomaru(n); else drawTetsuji(n); }); }
     function drawGlitches(){
       const colors=['#ff00ff','#ff99ff','#ffffff','#ff99ff'];
       glitches.forEach(g=>{
         if(!g.fixed){ g.flicker=(g.flicker+1)|0; ctx.globalAlpha=0.7 + Math.sin(Date.now()/200)*0.3;
           if(g.id==='ball'){
+            const isTele = (g.state==='telegraph');
             ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = colors[(g.flicker>>>3)%colors.length]; ctx.lineWidth=3;
+            ctx.strokeStyle = isTele ? '#ff66ff' : colors[(g.flicker>>>3)%colors.length]; ctx.lineWidth = isTele?3:3;
             ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*0.2, Math.PI*0.8); ctx.stroke();
             ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*1.2, Math.PI*1.8); ctx.stroke();
           } else {
@@ -276,79 +279,82 @@
       });
     }
 
-    // ===== Logic =====
-    function isBlocked(px, py, size){
-      const margin=2; const corners=[
-        {x:px+margin, y:py+margin},
-        {x:px+size-margin, y:py+margin},
-        {x:px+margin, y:py+size-margin},
-        {x:px+size-margin, y:py+size-margin}
-      ];
-      for(const c of corners){
-        const tx = Math.floor(c.x / TILE_SIZE), ty = Math.floor(c.y / TILE_SIZE);
-        const id = map[ty]?.[tx];
-        if(id===1 || id===3 || id===4 || id===5 || id===6) return true;
-      }
-      return false;
-    }
-
-    function movePlayer(dx, dy){
+    // ===== Update =====
+    function movePlayer(dx,dy){
       const nx=player.x+dx, ny=player.y+dy;
-      if(!isBlocked(nx, player.y, player.size)) player.x=nx;
-      if(!isBlocked(player.x, ny, player.size)) player.y=ny;
+      if(!isBlocked('player', nx, player.y, player.size)) player.x=nx;
+      if(!isBlocked('player', player.x, ny, player.size)) player.y=ny;
     }
+    function updatePlayer(){ player.isMoving=false; let dx=0,dy=0; if(keys.ArrowUp) dy-=player.speed; if(keys.ArrowDown) dy+=player.speed; if(keys.ArrowLeft) dx-=player.speed; if(keys.ArrowRight) dx+=player.speed; if(dx||dy) player.isMoving=true; movePlayer(dx,dy); }
 
-    function update(){
-      player.isMoving=false; let dx=0, dy=0;
-      if(keys.ArrowUp) { dy -= player.speed; player.isMoving=true; }
-      if(keys.ArrowDown){ dy += player.speed; player.isMoving=true; }
-      if(keys.ArrowLeft){ dx -= player.speed; player.isMoving=true; }
-      if(keys.ArrowRight){ dx += player.speed; player.isMoving=true; }
-      movePlayer(dx, dy);
-    }
-
-    function updateGlitches(){
-      glitches.forEach(g=>{
-        if(g.id==='ball' && !g.fixed && tetsujiQuestAccepted){
-          if(!g.vx && !g.vy){ g.vx = (Math.random()-.5)*5+1; g.vy=(Math.random()-.5)*5+1; }
-          g.x += g.vx; g.y += g.vy;
-          const m=TILE_SIZE; if(g.x<m || g.x+g.size>world.w-m) g.vx*=-1; if(g.y<m || g.y+g.size>world.h-m) g.vy*=-1;
-          const dist = Math.hypot((player.x+player.size/2)-(g.x+TILE_SIZE/2), (player.y+player.size/2)-(g.y+TILE_SIZE/2));
-          if(dist < player.size/2 + (g.size/3)){ g.fixed=true; handleGlitchFix('ball'); }
-        }
+    // 自動歩行（ソフトリード＋たまに方向転換）
+    function updateNPCs(dt){
+      npcs.forEach(n=>{
+        n.wander -= dt; if(n.wander<=0){ const ang=Math.random()*Math.PI*2; n.vx=Math.cos(ang)*n.speed; n.vy=Math.sin(ang)*n.speed; n.wander = 1200+Math.random()*1800; }
+        const dxh=n.homeX-n.x, dyh=n.homeY-n.y, d=Math.hypot(dxh,dyh); if(d>n.radius){ const ang=Math.atan2(dyh,dxh); n.vx=Math.cos(ang)*n.speed; n.vy=Math.sin(ang)*n.speed; }
+        const nx=n.x+n.vx, ny=n.y+n.vy; if(!isBlocked('npc', nx, n.y, n.size)) n.x=nx; else n.vx*=-0.6; if(!isBlocked('npc', n.x, ny, n.size)) n.y=ny; else n.vy*=-0.6;
       });
     }
 
+    // ボールを近接リングにスポーン→テレグラフ→逃走
+    function spawnBallNearPlayer(){
+      const ball = glitches.find(g=>g.id==='ball'); if(!ball) return;
+      const R = TILE_SIZE*5; let ang = Math.random()*Math.PI*2;
+      const bx = clamp(player.x + Math.cos(ang)*R, TILE_SIZE, world.w - TILE_SIZE*2);
+      const by = clamp(player.y + Math.sin(ang)*R, TILE_SIZE, world.h - TILE_SIZE*2);
+      ball.x=bx; ball.y=by; ball.state='telegraph'; ball.timer=900; ball.immune=900; ball.vx=0; ball.vy=0; ball.fixed=false;
+      showDialogue('？？？: なにかが現れた…', 1200, 'システム');
+    }
+
+    function updateBall(dt){
+      const ball = glitches.find(g=>g.id==='ball'); if(!ball || ball.fixed) return;
+      if(ball.state==='idle') return; // 受注前
+      if(ball.state==='telegraph'){
+        ball.timer -= dt; // 点滅演出は draw で色替え
+        if(ball.timer<=0){ const ang=Math.atan2(ball.y-player.y, ball.x-player.x); const spd=2.8; ball.vx=Math.cos(ang)*spd; ball.vy=Math.sin(ang)*spd; ball.state='run'; ball.timer=1800; showDialogue('ボール: ピコッ！', 900, 'システム'); }
+        return;
+      }
+      if(ball.state==='run'){
+        const speed=Math.hypot(ball.vx,ball.vy), maxSpd=4.2, acc=0.002*dt; const ns=Math.min(maxSpd, speed+acc); if(speed>0){ ball.vx*=ns/speed; ball.vy*=ns/speed; }
+        ball.x+=ball.vx; ball.y+=ball.vy;
+        if(ball.x<TILE_SIZE||ball.x>world.w-ball.size-TILE_SIZE) ball.vx*=-1;
+        if(ball.y<TILE_SIZE||ball.y>world.h-ball.size-TILE_SIZE) ball.vy*=-1;
+      }
+      if(ball.immune>0) ball.immune-=dt;
+      const d=dist(player.x+player.size/2, player.y+player.size/2, ball.x+ball.size/2, ball.y+ball.size/2);
+      if(ball.immune<=0 && d < player.size/2 + (ball.size/3)){ ball.fixed=true; ball.state='idle'; handleGlitchFix('ball'); }
+    }
+
+    function updateGlitches(){
+      // 通常バグの近接修復
+      glitches.forEach(g=>{
+        if(g.id==='normal' && !g.fixed){ const d=dist(player.x+player.size/2,player.y+player.size/2,g.x+TILE_SIZE/2,g.y+TILE_SIZE/2); if(d<TILE_SIZE){ g.fixed=true; handleGlitchFix('normal'); } }
+      });
+    }
+
+    // ===== Interact / Dialogue =====
     function showDialogue(text, duration=3000, speaker='ロセツ', isEnd=false){
       clearTimeout(dialogueTimeout);
-      let color='text-pink-500'; if(speaker==='komaru') color='text-green-600'; if(speaker==='tetsuji') color='text-yellow-700';
-      const speakerName = { komaru:'コマル先輩', tetsuji:'鉄二', 'ロセツ':'ロセツ' }[speaker] || 'ロセツ';
-      const html = `
-        <div class="dialogue-box bg-white bg-opacity-90 p-3 rounded-xl shadow-xl border-2 border-gray-300 max-w-md w-[92%] pointer-events-auto">
-          <p class="text-gray-800 font-bold"><span class="${color}">${speakerName}:</span> ${text}</p>
-          ${isEnd?'<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>':''}
-        </div>`;
-      dialogueEl.innerHTML = html;
-      dialogueTimeout = setTimeout(()=>{ dialogueEl.innerHTML=''; }, duration);
+      let color='text-pink-500'; if(speaker==='komaru') color='text-green-600'; if(speaker==='tetsuji') color='text-yellow-700'; if(speaker==='システム') color='text-blue-600';
+      const speakerName = { komaru:'コマル先輩', tetsuji:'鉄二', 'ロセツ':'ロセツ', 'システム':'システム' }[speaker] || 'ロセツ';
+      const html = `<div class="dialogue-box bg-white bg-opacity-95 p-3 rounded-xl shadow-xl border-2 border-gray-300 max-w-md w-[92%] pointer-events-auto">`+
+                   `<p class="text-gray-800 font-bold"><span class="${color}">${speakerName}:</span> ${text}</p>`+
+                   `${isEnd?'<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>':''}`+
+                   `</div>`;
+      dialogueEl.innerHTML = html; dialogueTimeout = setTimeout(()=>{ dialogueEl.innerHTML=''; }, duration);
     }
 
     function interact(){
       let acted=false;
       npcs.forEach(n=>{
-        const dist = Math.hypot((player.x+player.size/2)-(n.x+TILE_SIZE/2), (player.y+player.size/2)-(n.y+TILE_SIZE/2));
-        if(dist < TILE_SIZE*1.2){
+        const d=dist(player.x+player.size/2, player.y+player.size/2, n.x+TILE_SIZE/2, n.y+TILE_SIZE/2);
+        if(d<TILE_SIZE*1.2){
           if(n.id==='tetsuji' && !tetsujiQuestAccepted){
-            tetsujiQuestAccepted=true; showDialogue(n.dialogue, 3000, n.id);
-            setTimeout(()=>{ showDialogue('大変だ！あのボール、すごい勢いで動き出したぞ！', 3000, 'ロセツ'); }, 3100);
-          } else { showDialogue(n.dialogue, 4000, n.id); }
+            tetsujiQuestAccepted=true; showDialogue(n.dialogue, 2600, 'tetsuji');
+            setTimeout(()=>{ showDialogue('大変だ！あのボール、すごい勢いで動き出したぞ！', 2400, 'ロセツ'); }, 2700);
+            setTimeout(()=>{ spawnBallNearPlayer(); }, 1600);
+          } else { showDialogue(n.dialogue, 3200, n.id); }
           acted=true;
-        }
-      });
-      if(acted) return;
-      glitches.forEach(g=>{
-        if(g.id==='normal' && !g.fixed){
-          const dist = Math.hypot((player.x+player.size/2)-(g.x+TILE_SIZE/2), (player.y+player.size/2)-(g.y+TILE_SIZE/2));
-          if(dist < TILE_SIZE){ g.fixed=true; acted=true; handleGlitchFix('normal'); }
         }
       });
       if(!acted) showDialogue('クンクン…特に何もないみたいだ。', 1800, 'ロセツ');
@@ -357,50 +363,24 @@
     function handleGlitchFix(id){
       if(id==='ball'){
         showDialogue('この野球ボール…鉄二くんのだ！返してあげなきゃ！', 2600, 'ロセツ');
-        const t = npcs.find(n=>n.id==='tetsuji'); if(t) t.dialogue = 'わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！';
+        const t=npcs.find(n=>n.id==='tetsuji'); if(t) t.dialogue='わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！';
       } else { showDialogue('よし、世界のバグを直した！', 2200, 'ロセツ'); }
       checkWin();
     }
 
-    function checkWin(){ if(glitches.every(g=>g.fixed)) showDialogue('やった！全部のバグを直したぞ！これでみんな安心だ！', 4800, 'ロセツ', true); }
+    function checkWin(){ const allFixed = glitches.filter(g=>g.id!=='ball').every(g=>g.fixed) && glitches.find(g=>g.id==='ball')?.fixed; if(allFixed) showDialogue('やった！全部のバグを直したぞ！これでみんな安心だ！', 4800, 'ロセツ', true); }
 
-    // ===== Controls =====
-    function setupControls(){
-      const press = k=>{ keys[k]=true; if(!gameStarted) gameStarted=true; };
-      const release = k=>{ keys[k]=false; };
-      const S=[["btn-up","ArrowUp"],["btn-down","ArrowDown"],["btn-left","ArrowLeft"],["btn-right","ArrowRight"]];
-      for(const [id,key] of S){ const b=document.getElementById(id); b.addEventListener('pointerdown',e=>{e.preventDefault(); press(key);}); b.addEventListener('pointerup',e=>{e.preventDefault(); release(key);}); b.addEventListener('pointerleave',e=>{e.preventDefault(); release(key);}); }
-      document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
-      // Keyboard (for desktop test)
-      window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')) { keys[e.key]=true; if(!gameStarted) gameStarted=true; }});
-      window.addEventListener('keyup', e=>{ if(e.key.startsWith('Arrow')) { keys[e.key]=false; }});
-      // Tap to start
-      canvas.addEventListener('touchstart', ()=>{ if(!gameStarted){ gameStarted=true; showDialogue('お外の様子が変だ…パトロールしなきゃ！', 3000); } }, { once:false });
-    }
+    // ===== Loop =====
+    function frameBegin(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(-camera.x,-camera.y); }
+    function frameEnd(){ ctx.restore(); }
+    let last = performance.now();
+    function gameLoop(now){ const dt=Math.min(50, now-last); last=now; updatePlayer(); updateNPCs(dt); if(tetsujiQuestAccepted) updateBall(dt); updateGlitches(); clampCamera(player.x+player.size/2, player.y+player.size/2); frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawRosetsu(player); frameEnd(); requestAnimationFrame(gameLoop); }
 
-    // ===== Game Loop =====
-    function gameLoop(){
-      update();
-      updateGlitches();
-      clampCameraToPlayer(player.x + player.size/2, player.y + player.size/2);
-      beginFrame();
-      drawMap();
-      drawNPCs();
-      drawGlitches();
-      drawRosetsu(player);
-      endFrame();
-      requestAnimationFrame(gameLoop);
-    }
+    function startGame(){ setupControls(); showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム'); clampCamera(player.x, player.y); requestAnimationFrame(gameLoop); }
 
-    function startGame(){
-      setupControls();
-      showDialogue('ゲーム画面をタップしてスタート！', 3500, 'システム');
-      clampCameraToPlayer(player.x, player.y);
-      gameLoop();
-    }
-
-    // Relayout on rotate/resize
-    window.addEventListener('resize', ()=>{ layoutCanvas(); });
+    // ===== Boot =====
+    window.addEventListener('resize', layoutCanvas);
+    document.fonts && document.fonts.ready.then(layoutCanvas);
   </script>
 </body>
 </html>
