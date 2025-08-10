@@ -41,6 +41,9 @@
     #btn-up, #btn-down, #btn-left, #btn-right { display:none; }
     * { -webkit-user-select: none; user-select: none; }
     #gameCanvas { touch-action: none; }
+    /* 画面拡張：TALKボタンだけ右下にフローティング */
+    #controls{ position:fixed; inset:auto 12px calc(env(safe-area-inset-bottom) + 12px) auto; width:auto; display:block; background:transparent; box-shadow:none; z-index:25; }
+    #btn-action{ padding:14px 18px; border-radius:9999px; font-weight:700; }
   </style>
 </head>
 <body>
@@ -113,17 +116,19 @@
     // ===== Layout (iPhone考慮) =====
     const camera = { x:0, y:0, w:0, h:0, dpr:1 };
     function layoutCanvas(){
-      const rect = controlsEl.getBoundingClientRect();
-      const controlsHeight = Math.max(rect.height, 160);
-      const desiredHeight = Math.max(260, window.innerHeight - controlsHeight - 120);
-      const desiredWidth = Math.min(window.innerWidth, 820);
+      // コントロール（矢印）を撤去したので下部の余白は0扱い
+      const controlsHeight = 0;
+      const desiredHeight = Math.max(260, window.innerHeight - 24); // ほぼ全高
+      const desiredWidth  = Math.min(window.innerWidth, 820);
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.style.width = desiredWidth + 'px';
       canvas.style.height = desiredHeight + 'px';
-      canvas.width = Math.floor(desiredWidth * dpr);
+      canvas.width  = Math.floor(desiredWidth * dpr);
       canvas.height = Math.floor(desiredHeight * dpr);
       camera.w = desiredWidth; camera.h = desiredHeight; camera.dpr = dpr;
-      dialogueEl.style.bottom = (controlsHeight + 12) + 'px';
+      // セリフは上部固定（ノッチ安全域対応）
+      dialogueEl.style.bottom = '';
+      dialogueEl.style.top = 'calc(env(safe-area-inset-top) + 8px)';
     }
 
     // ===== Opening control =====
