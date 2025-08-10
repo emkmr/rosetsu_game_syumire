@@ -196,15 +196,21 @@
       window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
 
       // Pointer-based move: 画面を押した方向へ進む（ドラッグで方向変更、指を離すと停止）
-      const toWorld = (e)=>{ const r=canvas.getBoundingClientRect(); const sx=(e.clientX - r.left)*(canvas.width/r.width); const sy=(e.clientY - r.top)*(canvas.height/r.height); return { wx: sx/camera.dpr + camera.x, wy: sy/camera.dpr + camera.y };
-      const start = (e)=>{ e.preventDefault(); const p=toWorld(e); touch.active=true; touch.wx=p.wx; touch.wy=p.wy; if(!gameStarted) gameStarted=true; };
-      const move  = (e)=>{ if(!touch.active) return; e.preventDefault(); const p=toWorld(e); touch.wx=p.wx; touch.wy=p.wy; };
-      const end   = ()=>{ touch.active=false; };
-      canvas.addEventListener('pointerdown', start);
-      canvas.addEventListener('pointermove', move);
+      const toWorld = (e) => {
+        const r = canvas.getBoundingClientRect();
+        const sx = (e.clientX - r.left) * (canvas.width / r.width);
+        const sy = (e.clientY - r.top) * (canvas.height / r.height);
+        return { wx: sx / camera.dpr + camera.x, wy: sy / camera.dpr + camera.y };
+      };
+
+      const start = (e) => { e.preventDefault(); const p=toWorld(e); touch.active=true; touch.wx=p.wx; touch.wy=p.wy; if(!gameStarted) gameStarted=true; };
+      const move  = (e) => { if(!touch.active) return; e.preventDefault(); const p=toWorld(e); touch.wx=p.wx; touch.wy=p.wy; };
+      const end   = () => { touch.active=false; };
+
+      canvas.addEventListener('pointerdown', start, {passive:false});
+      canvas.addEventListener('pointermove',  move,  {passive:false});
       window.addEventListener('pointerup', end);
       window.addEventListener('pointercancel', end);
-    };
     }
 
     // ===== Utilities =====
