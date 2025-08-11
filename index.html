@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
-  <title>ロセツGAME2 — fixed</title>
+  <title>ロセツGAME2 — fixed + 6bit演出</title>
 
   <!-- PWA / Icons -->
   <link rel="manifest" href="manifest.webmanifest" />
@@ -52,6 +52,11 @@
     * { -webkit-user-select: none; user-select: none; }
     #controls{ position:fixed; inset:auto 12px calc(env(safe-area-inset-bottom) + 12px) auto; width:auto; display:block; background:transparent; box-shadow:none; z-index:25; }
     #btn-action{ padding:14px 18px; border-radius:9999px; font-weight:700; }
+
+    /* === 6-bit Binary Overlay === */
+    .binaryOverlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.75); z-index: 999; }
+    .binaryBox { font: 700 clamp(28px, 6vw, 64px)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; color: #a0ffcb; text-shadow: 0 0 20px rgba(160,255,203,0.45); text-align:center; }
+    .binarySub { font: 500 clamp(12px, 2vw, 18px)/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans JP', sans-serif; color: #b8ffd9; opacity: .85; margin-top: .6em; }
   </style>
 </head>
 <body>
@@ -106,6 +111,14 @@
     </div>
   </div>
 
+  <!-- === 6-bit Binary Overlay (DOM) === -->
+  <div id="binaryOverlay" class="binaryOverlay">
+    <div>
+      <div id="binaryText" class="binaryBox">000001</div>
+      <div class="binarySub">世界のコードが充填されています…</div>
+    </div>
+  </div>
+
   <script type="module">
     // ===== DOM refs =====
     const openingSequence = document.getElementById('openingSequence');
@@ -119,6 +132,10 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const dialogueEl = document.getElementById('dialogue-container');
+
+    // === 6-bit DOM ===
+    const binaryOverlay = document.getElementById('binaryOverlay');
+    const binaryText = document.getElementById('binaryText');
 
     // ===== Layout (iPhone考慮) =====
     const camera = { x:0, y:0, w:0, h:0, dpr:1 };
@@ -149,7 +166,6 @@
     openingSequence.addEventListener('touchstart', skipOpening, {passive:true});
     initialText.addEventListener('animationend', () => { if (openingSkipped) return; initialText.style.display='none'; starsContainer.style.display='block'; gameTitleOpening.style.display='block'; });
     gameTitleOpening.addEventListener('animationend', () => { if (openingSkipped) return; gameTitleOpening.style.display='none'; perspectiveContainer.style.display='block'; });
-    // SAFER: listen on the animated element itself
     document.querySelector('#perspectiveContainer .crawl-container')
       .addEventListener('animationend', () => { if (openingSkipped) return; skipOpening(); });
 
@@ -161,7 +177,7 @@
       Array.from({ length: WORLD_COLS }, (_, x) => (y===0||y===WORLD_ROWS-1||x===0||x===WORLD_COLS-1)?1:0)
     ));
     function addBlock(x,y,w,h,id){ for(let j=0;j<h;j++){ for(let i=0;i<w;i++){ map[y+j][x+i]=id; }}}
-    addBlock(8,6,6,3,3);   // x:8..13, y:6..8 (←ここは侵入不可)
+    addBlock(8,6,6,3,3);
     addBlock(16,12,4,7,4);
     addBlock(27,9,5,5,3);
     addBlock(40,20,8,4,4);
@@ -203,7 +219,7 @@
     // === Roses (6本・モノクロ) ===
     const ROSE_TARGET = 6;
     const roses = [
-      {x: 10*TILE_SIZE, y:  9*TILE_SIZE, taken:false}, // ← yを9に変更（侵入不可タイル外）
+      {x: 10*TILE_SIZE, y:  9*TILE_SIZE, taken:false},
       {x: 22*TILE_SIZE, y: 15*TILE_SIZE, taken:false},
       {x: 36*TILE_SIZE, y: 10*TILE_SIZE, taken:false},
       {x: 12*TILE_SIZE, y: 26*TILE_SIZE, taken:false},
@@ -215,6 +231,9 @@
     // === Revelation（世界の皮膜）===
     const revelation = { t:0, dur:2600, slow:0.35 };
     let desaturatePalette = 0; // 0..1
+
+    // === 6-bit state ===
+    let sixBitPlayed = false; // 一度だけ
 
     // MapにNPCをソリッド配置
     npcs.forEach(n=>{ const tx=Math.floor(n.x/TILE_SIZE), ty=Math.floor(n.y/TILE_SIZE); map[ty][tx]=n.type; });
@@ -232,8 +251,9 @@
     function setupControls(){
       document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
       window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }
-        // デバッグ: P キーでピンク宇宙を強制発火（1回限り）
+        // デバッグ: P キーでピンク宇宙、Bで6bit演出（どちらも1回限り）
         if(e.key.toLowerCase()==='p'){ triggerFlash(true); }
+        if(e.key.toLowerCase()==='b'){ if(!sixBitPlayed) triggerBinarySequence(true); }
       });
       window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
 
@@ -245,7 +265,7 @@
       };
 
       const tryAnomalyHit = (p)=>{
-        const tol = 36; // ヒット許容幅を拡大
+        const tol = 36; // ヒット許容幅
         for(const a of anomalies){
           if(a.hit) continue;
           const dc = Math.hypot(p.wx-a.x, p.wy-a.y);
@@ -468,7 +488,11 @@
           r.taken = true; roseCount++;
           triggerWhiteBurst(r.x+TILE_SIZE/2, r.y+TILE_SIZE/2);
           showDialogue(`色のないバラを手に入れた (${roseCount}/${ROSE_TARGET})`, 1200, 'システム');
-          if(roseCount >= ROSE_TARGET) triggerRevelation();
+          if(roseCount >= ROSE_TARGET){
+            // 6本揃ったらまず6ビット演出 → その完了後に格子Revelation
+            if(!sixBitPlayed) { triggerBinarySequence(); }
+            else { triggerRevelation(); }
+          }
         }
       }
     }
@@ -530,10 +554,42 @@
     }
 
     // ===== Revelation =====
-    function triggerRevelation(){ revelation.t = revelation.dur; desaturatePalette = 1; showDialogue('ここは…格子…？世界の骨組みが見える…', 2400, 'ロセツ'); }
+    function triggerRevelation(){
+      revelation.t = revelation.dur; desaturatePalette = 1;
+      showDialogue('ここは…格子…？世界の骨組みが見える…', 2400, 'ロセツ');
+    }
     function updateRevelation(dt){ if(revelation.t>0){ revelation.t -= dt; desaturatePalette = Math.max(0, revelation.t / revelation.dur); } }
     function drawRevelationOverlay(){ if(revelation.t<=0) return; ctx.save(); ctx.setTransform(1,0,0,1,0,0); const a=0.15+0.15*(revelation.t/revelation.dur); ctx.globalAlpha=a; for(let y=0;y<canvas.height;y+=3){ ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,y,canvas.width,1);} ctx.restore(); ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.translate(-camera.x,-camera.y); ctx.globalAlpha=0.25+0.35*(revelation.t/revelation.dur); ctx.strokeStyle='#00ffff'; ctx.lineWidth=1; for(let x=0;x<=world.w;x+=TILE_SIZE){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,world.h); ctx.stroke(); } for(let y=0;y<=world.h;y+=TILE_SIZE){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(world.w,y); ctx.stroke(); } ctx.restore(); }
     function drawDesaturateVeil(){ if(desaturatePalette<=0) return; ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.25 * desaturatePalette; ctx.fillStyle = '#cfcfcf'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore(); }
+
+    // ===== 6-bit Binary Sequence =====
+    function triggerBinarySequence(debug=false){
+      if(sixBitPlayed && !debug) return;
+      sixBitPlayed = true;
+      // 入力を弱める（既存のロックを流用）
+      const approxDuration = 2200; // だいたい
+      inputLockedUntil = performance.now() + approxDuration;
+      binaryOverlay.style.display = 'flex';
+      let val = 1; // 000001 から
+      const max = 63; // 111111
+      const baseTick = 50; // 開始速度
+
+      function step(){
+        const bin = val.toString(2).padStart(6,'0');
+        // ランダムに1フレームだけノイズ
+        binaryText.textContent = (Math.random()<0.12) ? bin.replace(/[01]/g,()=> (Math.random()>.5?'1':'0')) : bin;
+        const nextTick = Math.max(18, baseTick - val*0.4);
+        val++;
+        if(val<=max){ setTimeout(step, nextTick); }
+        else {
+          setTimeout(()=>{
+            binaryOverlay.style.display = 'none';
+            triggerRevelation(); // 既存の格子演出につなぐ
+          }, 120);
+        }
+      }
+      step();
+    }
 
     // ===== HUD =====
     function drawHUD(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); const pad=10; const x=canvas.width/camera.dpr-140-pad; const y=8+pad; ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(x,y,140,34); ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.strokeRect(x+0.5,y+0.5,139,33); ctx.fillStyle='#fff'; ctx.font='bold 16px system-ui, sans-serif'; ctx.fillText('🌹 ' + roseCount + '/' + ROSE_TARGET, x+10, y+22); ctx.restore(); }
