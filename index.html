@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000" />
   <title>ロセツGAME2</title>
 
-  <!-- PWA / Icons (重複とパス不整合を解消) -->
+  <!-- PWA / Icons -->
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
@@ -50,7 +50,6 @@
     #controls { padding-bottom: calc(var(--safe-bottom,0) + .25rem); }
     #btn-up, #btn-down, #btn-left, #btn-right { display:none; }
     * { -webkit-user-select: none; user-select: none; }
-    /* 画面拡張：TALKボタンだけ右下にフローティング */
     #controls{ position:fixed; inset:auto 12px calc(env(safe-area-inset-bottom) + 12px) auto; width:auto; display:block; background:transparent; box-shadow:none; z-index:25; }
     #btn-action{ padding:14px 18px; border-radius:9999px; font-weight:700; }
   </style>
@@ -119,7 +118,6 @@
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const controlsEl = document.getElementById('controls');
     const dialogueEl = document.getElementById('dialogue-container');
 
     // ===== Layout (iPhone考慮) =====
@@ -161,8 +159,12 @@
       Array.from({ length: WORLD_COLS }, (_, x) => (y===0||y===WORLD_ROWS-1||x===0||x===WORLD_COLS-1)?1:0)
     ));
     function addBlock(x,y,w,h,id){ for(let j=0;j<h;j++){ for(let i=0;i<w;i++){ map[y+j][x+i]=id; }}}
-    addBlock(8,6,6,3,3); addBlock(16,12,4,7,4); addBlock(27,9,5,5,3);
-    addBlock(40,20,8,4,4); addBlock(45,30,5,5,3); addBlock(12,28,7,4,4);
+    addBlock(8,6,6,3,3);   // x:8..13, y:6..8 (←ここは侵入不可)
+    addBlock(16,12,4,7,4);
+    addBlock(27,9,5,5,3);
+    addBlock(40,20,8,4,4);
+    addBlock(45,30,5,5,3);
+    addBlock(12,28,7,4,4);
 
     const START_TX = 4, START_TY = WORLD_ROWS - 6;
 
@@ -172,10 +174,13 @@
 
     const anomalies = []; // {x,y,age,life,maxR,hit:false,rings:3}
     let anomalyTimer = 0; // 次のスポーンまでの残りms
-    const flash = { t:0, dur:0, stars:[], cb:null }; // フラッシュ制御
-    let inputLockedUntil = 0; // フラッシュ中の入力ロック
+    const flash = { t:0, dur:0, stars:[], cb:null }; // ピンク宇宙
+    let inputLockedUntil = 0;
 
-    // タップ移動コントロール
+    // ホワイトバースト（バラ専用）
+    const bursts = []; // {x,y,age,dur,ringR}
+
+    // タップ移動
     const touch = { active:false, wx:0, wy:0 };
 
     const npcs = [
@@ -189,6 +194,22 @@
       { id:'normal', x:33*TILE_SIZE, y:18*TILE_SIZE, size:TILE_SIZE, fixed:false },
       { id:'ball',   x:44*TILE_SIZE, y:26*TILE_SIZE, size:TILE_SIZE, fixed:false, vx:0, vy:0, flicker:0, state:'idle', timer:0, immune:0 }
     ];
+
+    // === Roses (6本・モノクロ) ===
+    const ROSE_TARGET = 6;
+    const roses = [
+      {x: 10*TILE_SIZE, y:  9*TILE_SIZE, taken:false}, // ← yを9に変更（侵入不可タイル外）
+      {x: 22*TILE_SIZE, y: 15*TILE_SIZE, taken:false},
+      {x: 36*TILE_SIZE, y: 10*TILE_SIZE, taken:false},
+      {x: 12*TILE_SIZE, y: 26*TILE_SIZE, taken:false},
+      {x: 44*TILE_SIZE, y: 32*TILE_SIZE, taken:false},
+      {x: 52*TILE_SIZE, y: 14*TILE_SIZE, taken:false},
+    ];
+    let roseCount = 0;
+
+    // === Revelation（世界の皮膜）===
+    const revelation = { t:0, dur:2600, slow:0.35 };
+    let desaturatePalette = 0; // 0..1
 
     // MapにNPCをソリッド配置
     npcs.forEach(n=>{ const tx=Math.floor(n.x/TILE_SIZE), ty=Math.floor(n.y/TILE_SIZE); map[ty][tx]=n.type; });
@@ -216,13 +237,15 @@
       };
 
       const tryAnomalyHit = (p)=>{
+        const tol = 28; // px
         for(const a of anomalies){
           if(a.hit) continue;
+          const dc = Math.hypot(p.wx-a.x, p.wy-a.y);
+          if(dc < 14){ a.hit=true; triggerFlash(); return true; }
           for(let i=0;i<(a.rings||1);i++){
             const phase = (a.age/a.life + i/(a.rings||1)) % 1;
             const ring = a.maxR * phase;
-            const d = Math.hypot(p.wx-a.x, p.wy-a.y);
-            if(Math.abs(d - ring) < 18){ a.hit=true; triggerFlash(); return true; }
+            if(Math.abs(dc - ring) < tol){ a.hit=true; triggerFlash(); return true; }
           }
         }
         return false;
@@ -259,12 +282,58 @@
       return false;
     }
 
+    // ===== Dialogue UI =====
+    function showDialogue(text, duration=3000, speaker='ロセツ', isEnd=false){
+      clearTimeout(dialogueTimeout);
+      let color='text-pink-500'; if(speaker==='komaru') color='text-green-600'; if(speaker==='tetsuji') color='text-yellow-700'; if(speaker==='システム') color='text-blue-600';
+      const speakerName = { komaru:'コマル先輩', tetsuji:'鉄二', 'ロセツ':'ロセツ', 'システム':'システム' }[speaker] || 'ロセツ';
+      const html = `
+        <div class="dialogue-box bg-white bg-opacity-95 p-3 rounded-xl shadow-xl border-2 border-gray-300 max-w-md w-[92%] pointer-events-auto">
+          <p class="text-gray-800 font-bold"><span class="${color}">${speakerName}:</span> ${text}</p>
+          ${isEnd?'<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>':''}
+        </div>`;
+      dialogueEl.innerHTML = html; dialogueTimeout = setTimeout(()=>{ dialogueEl.innerHTML=''; }, duration);
+    }
+
     // ===== Draw =====
     function drawMap(){
       const sc=Math.max(0,Math.floor(camera.x/TILE_SIZE)-1), ec=Math.min(WORLD_COLS-1,Math.ceil((camera.x+camera.w)/TILE_SIZE)+1);
       const sr=Math.max(0,Math.floor(camera.y/TILE_SIZE)-1), er=Math.min(WORLD_ROWS-1,Math.ceil((camera.y+camera.h)/TILE_SIZE)+1);
       for(let y=sr;y<=er;y++) for(let x=sc;x<=ec;x++){ const id=map[y][x]; let color='#a3bf8f'; if(id===1) color='#7a6855'; else if(id===3) color='#8aab79'; else if(id===4) color='#6b8e23'; ctx.fillStyle=color; ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE); }
     }
+
+    // ==== Roses (gray) ====
+    function drawRose(r){
+      const s = TILE_SIZE*0.5;
+      ctx.save();
+      ctx.translate(r.x + TILE_SIZE/2, r.y + TILE_SIZE/2);
+      ctx.fillStyle = '#777';
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, -s*0.2, s*0.35, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-s*0.2, -s*0.25); ctx.quadraticCurveTo(0, -s*0.45, s*0.2, -s*0.25); ctx.quadraticCurveTo(0, -s*0.05, -s*0.2, -s*0.25); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -s*0.0); ctx.lineTo(0, s*0.45); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, s*0.2); ctx.quadraticCurveTo(s*0.25, s*0.15, s*0.18, 0); ctx.quadraticCurveTo(s*0.1, s*0.18, 0, s*0.2); ctx.fillStyle='#666'; ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    function drawRoses(){ roses.forEach(r=>{ if(!r.taken) drawRose(r); }); }
+
+    // ホワイトバースト（バラ獲得時）
+    function triggerWhiteBurst(x,y){ bursts.push({x,y,age:0,dur:700,ringR:0}); }
+    function updateBursts(dt){ for(let i=bursts.length-1;i>=0;i--){ const b=bursts[i]; b.age+=dt; b.ringR += dt*0.12*TILE_SIZE; if(b.age>b.dur) bursts.splice(i,1); } }
+    function drawBursts(){
+      if(!bursts.length) return;
+      ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.translate(-camera.x,-camera.y);
+      bursts.forEach(b=>{
+        const t = Math.max(0, 1 - b.age/b.dur);
+        ctx.save(); ctx.globalAlpha = 0.5*t + 0.2; ctx.beginPath(); ctx.arc(b.x, b.y, 18 + 30*(1-t), 0, Math.PI*2); ctx.fillStyle='white'; ctx.fill();
+        ctx.globalCompositeOperation='lighter'; ctx.globalAlpha = 0.35*t; const grd = ctx.createRadialGradient(b.x,b.y,10,b.x,b.y,90); grd.addColorStop(0,'rgba(255,255,255,0.9)'); grd.addColorStop(1,'rgba(255,255,255,0)'); ctx.beginPath(); ctx.arc(b.x, b.y, 90, 0, Math.PI*2); ctx.fillStyle=grd; ctx.fill();
+        ctx.globalAlpha = 0.55*t; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(b.x, b.y, 20 + b.ringR, 0, Math.PI*2); ctx.stroke();
+        ctx.restore();
+      });
+      ctx.restore();
+    }
+
     function drawRosetsu(p){
       ctx.save(); ctx.translate(p.x+p.size/2, p.y+p.size/2); if(p.isMoving) ctx.translate(0, Math.sin(Date.now()/100)*2);
       ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2;
@@ -286,7 +355,6 @@
       ctx.beginPath(); ctx.moveTo(p.size*.2,-p.size*.3); ctx.quadraticCurveTo(p.size*.4,-p.size*.45,p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke();
       ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(0,-p.size*.15,1.5,0,Math.PI*2); ctx.fill();
       ctx.strokeStyle='black'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-p.size*.1,-p.size*.1); ctx.quadraticCurveTo(0,-p.size*.07,p.size*.1,-p.size*.1); ctx.stroke();
-      if(!tetsujiQuestAccepted && dist(player.x,player.y,n.x,n.y)<TILE_SIZE*3){ ctx.fillStyle='#ffcc00'; ctx.font='bold 18px sans-serif'; ctx.fillText('！', -4, -p.size*.8); }
       ctx.restore();
     }
     function drawTetsuji(n){
@@ -298,7 +366,6 @@
       ctx.beginPath(); ctx.ellipse(p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
       ctx.fillStyle='#3d3532'; ctx.beginPath(); ctx.ellipse(0,0,p.size*.25,p.size*.1,0,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(0,p.size*.02,p.size*.04,0,Math.PI*2); ctx.fill();
-      if(!tetsujiQuestAccepted){ ctx.fillStyle='#ffcc00'; ctx.font='bold 18px sans-serif'; ctx.fillText('！', -4, -p.size*.8); }
       ctx.restore();
     }
     function drawNPCs(){ npcs.forEach(n=>{ if(n.id==='komaru') drawKomaru(n); else drawTetsuji(n); }); }
@@ -384,40 +451,55 @@
       });
     }
 
+    // ===== Roses =====
+    function updateRoses(){
+      for(const r of roses){
+        if(r.taken) continue;
+        const d = dist(player.x+player.size/2, player.y+player.size/2, r.x+TILE_SIZE/2, r.y+TILE_SIZE/2);
+        if(d < TILE_SIZE*0.7){
+          r.taken = true; roseCount++;
+          triggerWhiteBurst(r.x+TILE_SIZE/2, r.y+TILE_SIZE/2);
+          showDialogue(`色のないバラを手に入れた (${roseCount}/${ROSE_TARGET})`, 1200, 'システム');
+          if(roseCount >= ROSE_TARGET) triggerRevelation();
+        }
+      }
+    }
+
     // ===== Anomaly (音の波動) =====
     function spawnAnomaly(){
-      const margin = TILE_SIZE*3;
-      const x = Math.random()*(world.w - margin*2) + margin;
-      const y = Math.random()*(world.h - margin*2) + margin;
+      const remaining = roses.filter(r=>!r.taken);
+      const margin = TILE_SIZE*3; let x, y;
+      if(remaining.length>0 && Math.random()<0.7){
+        const r = remaining[Math.floor(Math.random()*remaining.length)];
+        const R = TILE_SIZE * (4 + Math.random()*4);
+        const ang = Math.random()*Math.PI*2;
+        x = clamp(r.x + Math.cos(ang)*R, margin, world.w - margin);
+        y = clamp(r.y + Math.sin(ang)*R, margin, world.h - margin);
+      }else{
+        x = Math.random()*(world.w - margin*2) + margin;
+        y = Math.random()*(world.h - margin*2) + margin;
+      }
       anomalies.push({ x, y, age:0, life:6000, maxR:TILE_SIZE*9, hit:false, rings:3 });
     }
     function updateAnomalies(dt){
       anomalyTimer -= dt;
       if(anomalyTimer<=0){ spawnAnomaly(); anomalyTimer = 3000 + Math.random()*3000; }
-      for(let i=anomalies.length-1;i>=0;i--){
-        const a = anomalies[i];
-        a.age += dt;
-        if(a.age > a.life) anomalies.splice(i,1);
-      }
+      for(let i=anomalies.length-1;i>=0;i--){ const a = anomalies[i]; a.age += dt; if(a.age > a.life) anomalies.splice(i,1); }
     }
     function drawAnomalies(){
       ctx.save();
       anomalies.forEach(a=>{
         for(let i=0;i<a.rings;i++){
-          const phase = (a.age/a.life + i/a.rings) % 1; // 0..1
+          const phase = (a.age/a.life + i/a.rings) % 1;
           const r = a.maxR * phase;
           const alpha = 0.75 * (1 - phase);
-          ctx.beginPath();
-          ctx.arc(a.x, a.y, r, 0, Math.PI*2);
+          ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI*2);
           ctx.strokeStyle = 'rgba(255,105,180,' + alpha + ')';
-          ctx.lineWidth = 4;
-          ctx.stroke();
+          ctx.lineWidth = 4; ctx.stroke();
         }
         const pulse = 1 + 0.25 * Math.sin(a.age/120);
-        ctx.beginPath();
-        ctx.arc(a.x, a.y, 6*pulse, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(255,105,180,0.85)';
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(a.x, a.y, 6*pulse, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,105,180,0.85)'; ctx.fill();
       });
       ctx.restore();
     }
@@ -426,52 +508,26 @@
       inputLockedUntil = performance.now() + flash.dur + 40;
       const area = canvas.width * canvas.height;
       const count = Math.max(80, Math.min(220, Math.floor(area / 8000)));
-      flash.stars = Array.from({length: count}, () => ({
-        x: Math.random()*canvas.width,
-        y: Math.random()*canvas.height,
-        r: 0.6 + Math.random()*1.8,
-        tw: Math.random()*Math.PI*2
-      }));
-      flash.cb = () => {
-        showDialogue('今のは、、、宇宙に見えた、、、ピンクの空に星。なんなんだ、、、、まぼろし？？', 3200, 'ロセツ');
-      };
+      flash.stars = Array.from({length: count}, () => ({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: 0.6 + Math.random()*1.8, tw: Math.random()*Math.PI*2 }));
+      flash.cb = () => { showDialogue('今のは、、、宇宙に見えた、、、ピンクの空に星。なんなんだ、、、、まぼろし？？', 3200, 'ロセツ'); };
     }
     function drawFlashOverlay(dt){
-      if(flash.t<=0) return;
-      flash.t -= dt;
-      const k = Math.max(0, flash.t/flash.dur); // 1→0
-      ctx.save();
-      ctx.setTransform(1,0,0,1,0,0);
-      ctx.globalAlpha = 0.92 * (0.4 + 0.6*k);
-      ctx.fillStyle = '#ff0099';
-      ctx.fillRect(0,0,canvas.width,canvas.height);
-      const tnow = performance.now();
-      ctx.globalAlpha = 1.0;
-      for(const s of flash.stars){
-        const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw);
-        const y  = s.y - (1.2 * (1-k));
-        ctx.beginPath();
-        ctx.arc(s.x, y, s.r*tw, 0, Math.PI*2);
-        ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)';
-        ctx.fill();
-      }
-      ctx.restore();
-      if(flash.t<=0 && typeof flash.cb === 'function'){ const cb = flash.cb; flash.cb = null; cb(); }
+      if(flash.t<=0) return; flash.t -= dt; const k = Math.max(0, flash.t/flash.dur);
+      ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.92 * (0.4 + 0.6*k); ctx.fillStyle = '#ff0099'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      const tnow = performance.now(); ctx.globalAlpha = 1.0; for(const s of flash.stars){ const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw); const y  = s.y - (1.2 * (1-k)); ctx.beginPath(); ctx.arc(s.x, y, s.r*tw, 0, Math.PI*2); ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)'; ctx.fill(); }
+      ctx.restore(); if(flash.t<=0 && typeof flash.cb === 'function'){ const cb = flash.cb; flash.cb = null; cb(); }
     }
 
-    // ===== Interact / Dialogue =====
-    function showDialogue(text, duration=3000, speaker='ロセツ', isEnd=false){
-      clearTimeout(dialogueTimeout);
-      let color='text-pink-500'; if(speaker==='komaru') color='text-green-600'; if(speaker==='tetsuji') color='text-yellow-700'; if(speaker==='システム') color='text-blue-600';
-      const speakerName = { komaru:'コマル先輩', tetsuji:'鉄二', 'ロセツ':'ロセツ', 'システム':'システム' }[speaker] || 'ロセツ';
-      const html = `
-        <div class="dialogue-box bg-white bg-opacity-95 p-3 rounded-xl shadow-xl border-2 border-gray-300 max-w-md w-[92%] pointer-events-auto">
-          <p class="text-gray-800 font-bold"><span class="${color}">${speakerName}:</span> ${text}</p>
-          ${isEnd?'<p class="text-center text-sm mt-2 text-blue-600">クリアおめでとう！ - ページをリロードしてリスタート</p>':''}
-        </div>`;
-      dialogueEl.innerHTML = html; dialogueTimeout = setTimeout(()=>{ dialogueEl.innerHTML=''; }, duration);
-    }
+    // ===== Revelation =====
+    function triggerRevelation(){ revelation.t = revelation.dur; desaturatePalette = 1; showDialogue('ここは…格子…？世界の骨組みが見える…', 2400, 'ロセツ'); }
+    function updateRevelation(dt){ if(revelation.t>0){ revelation.t -= dt; desaturatePalette = Math.max(0, revelation.t / revelation.dur); } }
+    function drawRevelationOverlay(){ if(revelation.t<=0) return; ctx.save(); ctx.setTransform(1,0,0,1,0,0); const a=0.15+0.15*(revelation.t/revelation.dur); ctx.globalAlpha=a; for(let y=0;y<canvas.height;y+=3){ ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,y,canvas.width,1);} ctx.restore(); ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.translate(-camera.x,-camera.y); ctx.globalAlpha=0.25+0.35*(revelation.t/revelation.dur); ctx.strokeStyle='#00ffff'; ctx.lineWidth=1; for(let x=0;x<=world.w;x+=TILE_SIZE){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,world.h); ctx.stroke(); } for(let y=0;y<=world.h;y+=TILE_SIZE){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(world.w,y); ctx.stroke(); } ctx.restore(); }
+    function drawDesaturateVeil(){ if(desaturatePalette<=0) return; ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.25 * desaturatePalette; ctx.fillStyle = '#cfcfcf'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore(); }
 
+    // ===== HUD =====
+    function drawHUD(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); const pad=10; const x=canvas.width/camera.dpr-140-pad; const y=8+pad; ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(x,y,140,34); ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.strokeRect(x+0.5,y+0.5,139,33); ctx.fillStyle='#fff'; ctx.font='bold 16px system-ui, sans-serif'; ctx.fillText('🌹 ' + roseCount + '/' + ROSE_TARGET, x+10, y+22); ctx.restore(); }
+
+    // ===== Interact / Quest =====
     function interact(){
       let acted=false;
       npcs.forEach(n=>{
@@ -506,10 +562,20 @@
     function drawTouchIndicator(){ if(!touch.active) return; ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(touch.wx, touch.wy, 12, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
     function frameEnd(){ ctx.restore(); }
     let last = performance.now();
-    function gameLoop(now){ const dt=Math.min(50, now-last); last=now; updatePlayer(); updateNPCs(dt); if(tetsujiQuestAccepted) updateBall(dt); updateGlitches(); updateAnomalies(dt); clampCamera(player.x+player.size/2, player.y+player.size/2); frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawAnomalies(); drawRosetsu(player); drawTouchIndicator(); frameEnd();
-      drawFlashOverlay(dt); requestAnimationFrame(gameLoop); }
+    function gameLoop(now){
+      const dt=Math.min(50, now-last); last=now; const timeScale = revelation.t>0 ? revelation.slow : 1; const sdt = dt * timeScale;
+      updatePlayer(); updateNPCs(sdt); if(tetsujiQuestAccepted) updateBall(sdt); updateGlitches(); updateAnomalies(sdt); updateRoses(); updateRevelation(sdt); updateBursts(sdt);
+      clampCamera(player.x+player.size/2, player.y+player.size/2);
+      frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawAnomalies(); drawRoses(); drawRosetsu(player); drawTouchIndicator(); drawHUD(); frameEnd();
+      drawDesaturateVeil(); drawFlashOverlay(sdt); drawRevelationOverlay(); drawBursts();
+      requestAnimationFrame(gameLoop);
+    }
 
-    function startGame(){ setupControls(); showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム'); clampCamera(player.x, player.y); requestAnimationFrame(gameLoop); }
+    function startGame(){
+      setupControls(); showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム'); clampCamera(player.x, player.y);
+      // 最初の波動を確実に出す
+      spawnAnomaly(); anomalyTimer = 2500 + Math.random()*1000; requestAnimationFrame(gameLoop);
+    }
 
     // ===== Boot =====
     window.addEventListener('resize', layoutCanvas);
