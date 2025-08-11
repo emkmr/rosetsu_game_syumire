@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
-  <title>ロセツGAME2</title>
+  <title>ロセツGAME2 — fixed</title>
 
   <!-- PWA / Icons -->
   <link rel="manifest" href="manifest.webmanifest" />
@@ -149,7 +149,9 @@
     openingSequence.addEventListener('touchstart', skipOpening, {passive:true});
     initialText.addEventListener('animationend', () => { if (openingSkipped) return; initialText.style.display='none'; starsContainer.style.display='block'; gameTitleOpening.style.display='block'; });
     gameTitleOpening.addEventListener('animationend', () => { if (openingSkipped) return; gameTitleOpening.style.display='none'; perspectiveContainer.style.display='block'; });
-    crawlContainer.addEventListener('animationend', () => { if (openingSkipped) return; skipOpening(); });
+    // SAFER: listen on the animated element itself
+    document.querySelector('#perspectiveContainer .crawl-container')
+      .addEventListener('animationend', () => { if (openingSkipped) return; skipOpening(); });
 
     // ===== World =====
     const TILE_SIZE = 48;
@@ -176,6 +178,9 @@
     let anomalyTimer = 0; // 次のスポーンまでの残りms
     const flash = { t:0, dur:0, stars:[], cb:null }; // ピンク宇宙
     let inputLockedUntil = 0;
+
+    // 1回だけピンク宇宙にする
+    let pinkSeen = false;
 
     // ホワイトバースト（バラ専用）
     const bursts = []; // {x,y,age,dur,ringR}
@@ -226,7 +231,10 @@
     // ===== Input =====
     function setupControls(){
       document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
-      window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }});
+      window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }
+        // デバッグ: P キーでピンク宇宙を強制発火（1回限り）
+        if(e.key.toLowerCase()==='p'){ triggerFlash(true); }
+      });
       window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
 
       const toWorld = (e) => {
@@ -237,11 +245,11 @@
       };
 
       const tryAnomalyHit = (p)=>{
-        const tol = 28; // px
+        const tol = 36; // ヒット許容幅を拡大
         for(const a of anomalies){
           if(a.hit) continue;
           const dc = Math.hypot(p.wx-a.x, p.wy-a.y);
-          if(dc < 14){ a.hit=true; triggerFlash(); return true; }
+          if(dc < 20){ a.hit=true; triggerFlash(); return true; }
           for(let i=0;i<(a.rings||1);i++){
             const phase = (a.age/a.life + i/(a.rings||1)) % 1;
             const ring = a.maxR * phase;
@@ -503,7 +511,10 @@
       });
       ctx.restore();
     }
-    function triggerFlash(){
+
+    function triggerFlash(force=false){
+      if(pinkSeen && !force) return; // 1回だけ
+      pinkSeen = true;
       flash.dur = 1200; flash.t = flash.dur;
       inputLockedUntil = performance.now() + flash.dur + 40;
       const area = canvas.width * canvas.height;
@@ -513,7 +524,7 @@
     }
     function drawFlashOverlay(dt){
       if(flash.t<=0) return; flash.t -= dt; const k = Math.max(0, flash.t/flash.dur);
-      ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.92 * (0.4 + 0.6*k); ctx.fillStyle = '#ff0099'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.92 * (1.0); ctx.fillStyle = '#ff0099'; ctx.fillRect(0,0,canvas.width,canvas.height);
       const tnow = performance.now(); ctx.globalAlpha = 1.0; for(const s of flash.stars){ const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw); const y  = s.y - (1.2 * (1-k)); ctx.beginPath(); ctx.arc(s.x, y, s.r*tw, 0, Math.PI*2); ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)'; ctx.fill(); }
       ctx.restore(); if(flash.t<=0 && typeof flash.cb === 'function'){ const cb = flash.cb; flash.cb = null; cb(); }
     }
@@ -580,7 +591,7 @@
     // ===== Boot =====
     window.addEventListener('resize', layoutCanvas);
     window.addEventListener('load', layoutCanvas);
-    document.fonts && document.fonts.ready.then(layoutCanvas);
+    document.fonts && document.fonts.ready && document.fonts.ready.then(layoutCanvas);
   </script>
 </body>
 </html>
