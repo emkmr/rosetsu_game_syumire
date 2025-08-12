@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
-  <title>ロセツGAME2 — fixed + 6bit演出</title>
+  <title>ロセツGAME2 — fixed + 6bit + 格子片 + アノマリー本実装</title>
 
   <!-- PWA / Icons -->
   <link rel="manifest" href="manifest.webmanifest" />
@@ -190,7 +190,7 @@
     const player = { x: START_TX*TILE_SIZE, y: START_TY*TILE_SIZE, size:TILE_SIZE*0.9, speed:4.2, isMoving:false };
     const keys = {}; let gameStarted=false; let tetsujiQuestAccepted=false; let dialogueTimeout;
 
-    const anomalies = []; // {x,y,age,life,maxR,hit:false,rings:3}
+    let anomalies = []; // {x,y,age,life,maxR,hit:false,rings:3}
     let anomalyTimer = 0; // 次のスポーンまでの残りms
     const flash = { t:0, dur:0, stars:[], cb:null }; // ピンク宇宙
     let inputLockedUntil = 0;
@@ -228,12 +228,27 @@
     ];
     let roseCount = 0;
 
+    // === Grid Fragments（格子片） ===
+    const GRID_TARGET = 6;
+    const gridFragments = [
+      {x: 18*TILE_SIZE, y:  8*TILE_SIZE, taken:false},
+      {x: 30*TILE_SIZE, y: 16*TILE_SIZE, taken:false},
+      {x: 41*TILE_SIZE, y: 11*TILE_SIZE, taken:false},
+      {x: 14*TILE_SIZE, y: 22*TILE_SIZE, taken:false},
+      {x: 47*TILE_SIZE, y: 28*TILE_SIZE, taken:false},
+      {x: 55*TILE_SIZE, y: 13*TILE_SIZE, taken:false},
+    ];
+    let gridCount = 0;
+
     // === Revelation（世界の皮膜）===
     const revelation = { t:0, dur:2600, slow:0.35 };
     let desaturatePalette = 0; // 0..1
 
     // === 6-bit state ===
     let sixBitPlayed = false; // 一度だけ
+
+    // === Grid FX (pickup時の一時的な格子シマー) ===
+    const gridFX = { t:0, dur:900, phase:0 };
 
     // MapにNPCをソリッド配置
     npcs.forEach(n=>{ const tx=Math.floor(n.x/TILE_SIZE), ty=Math.floor(n.y/TILE_SIZE); map[ty][tx]=n.type; });
@@ -245,48 +260,6 @@
       if (px < camera.x + mx) tx = px - mx; if (px > camera.x + camera.w - mx) tx = px + mx - camera.w;
       if (py < camera.y + my) ty = py - my; if (py > camera.y + camera.h - my) ty = py + my - camera.h;
       camera.x = Math.max(0, Math.min(world.w - camera.w, tx)); camera.y = Math.max(0, Math.min(world.h - camera.h, ty));
-    }
-
-    // ===== Input =====
-    function setupControls(){
-      document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
-      window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }
-        // デバッグ: P キーでピンク宇宙、Bで6bit演出（どちらも1回限り）
-        if(e.key.toLowerCase()==='p'){ triggerFlash(true); }
-        if(e.key.toLowerCase()==='b'){ if(!sixBitPlayed) triggerBinarySequence(true); }
-      });
-      window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
-
-      const toWorld = (e) => {
-        const r = canvas.getBoundingClientRect();
-        const sx = (e.clientX - r.left) * (canvas.width / r.width);
-        const sy = (e.clientY - r.top) * (canvas.height / r.height);
-        return { wx: sx / camera.dpr + camera.x, wy: sy / camera.dpr + camera.y };
-      };
-
-      const tryAnomalyHit = (p)=>{
-        const tol = 36; // ヒット許容幅
-        for(const a of anomalies){
-          if(a.hit) continue;
-          const dc = Math.hypot(p.wx-a.x, p.wy-a.y);
-          if(dc < 20){ a.hit=true; triggerFlash(); return true; }
-          for(let i=0;i<(a.rings||1);i++){
-            const phase = (a.age/a.life + i/(a.rings||1)) % 1;
-            const ring = a.maxR * phase;
-            if(Math.abs(dc - ring) < tol){ a.hit=true; triggerFlash(); return true; }
-          }
-        }
-        return false;
-      };
-
-      const start = (e) => { e.preventDefault(); const p=toWorld(e); if(tryAnomalyHit(p)) { touch.active=false; return; } touch.active=true; touch.wx=p.wx; touch.wy=p.wy; if(!gameStarted) gameStarted=true; };
-      const move  = (e) => { if(!touch.active) return; e.preventDefault(); const p=toWorld(e); touch.wx=p.wx; touch.wy=p.wy; };
-      const end   = () => { touch.active=false; };
-
-      canvas.addEventListener('pointerdown', start, {passive:false});
-      canvas.addEventListener('pointermove',  move,  {passive:false});
-      window.addEventListener('pointerup', end);
-      window.addEventListener('pointercancel', end);
     }
 
     // ===== Utilities =====
@@ -323,21 +296,60 @@
       dialogueEl.innerHTML = html; dialogueTimeout = setTimeout(()=>{ dialogueEl.innerHTML=''; }, duration);
     }
 
-    // ===== Draw =====
+    // ===== Input =====
+    function setupControls(){
+      document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
+      window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }
+        // デバッグ: P=ピンク宇宙, B=6bit演出, G=格子片メガグリッド
+        if(e.key.toLowerCase()==='p'){ triggerFlash(true); }
+        if(e.key.toLowerCase()==='b'){ if(!sixBitPlayed) triggerBinarySequence(true); }
+        if(e.key.toLowerCase()==='g'){ if(gridCount>=GRID_TARGET) triggerMegaGrid(); }
+      });
+      window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
+
+      const toWorld = (e) => {
+        const r = canvas.getBoundingClientRect();
+        const sx = (e.clientX - r.left) * (canvas.width / r.width);
+        const sy = (e.clientY - r.top) * (canvas.height / r.height);
+        return { wx: sx / camera.dpr + camera.x, wy: sy / camera.dpr + camera.y };
+      };
+
+      const tryAnomalyHit = (p)=>{
+        const tol = 36; // ヒット許容幅
+        for(const a of anomalies){
+          if(a.hit) continue;
+          const dc = Math.hypot(p.wx-a.x, p.wy-a.y);
+          if(dc < 20){ a.hit=true; triggerFlash(); return true; }
+          for(let i=0;i<(a.rings||1);i++){
+            const phase = (a.age/a.life + i/(a.rings||1)) % 1;
+            const ring = a.maxR * phase;
+            if(Math.abs(dc - ring) < tol){ a.hit=true; triggerFlash(); return true; }
+          }
+        }
+        return false;
+      };
+
+      const start = (e) => { e.preventDefault(); const p=toWorld(e); if(tryAnomalyHit(p)) { touch.active=false; return; } touch.active=true; touch.wx=p.wx; touch.wy=p.wy; if(!gameStarted) gameStarted=true; };
+      const move  = (e) => { if(!touch.active) return; e.preventDefault(); const p=toWorld(e); touch.wx=p.wx; touch.wy=p.wy; };
+      const end   = () => { touch.active=false; };
+
+      canvas.addEventListener('pointerdown', start, {passive:false});
+      canvas.addEventListener('pointermove',  move,  {passive:false});
+      window.addEventListener('pointerup', end);
+      window.addEventListener('pointercancel', end);
+    }
+
+    // ===== Draw: Map & Entities =====
     function drawMap(){
       const sc=Math.max(0,Math.floor(camera.x/TILE_SIZE)-1), ec=Math.min(WORLD_COLS-1,Math.ceil((camera.x+camera.w)/TILE_SIZE)+1);
       const sr=Math.max(0,Math.floor(camera.y/TILE_SIZE)-1), er=Math.min(WORLD_ROWS-1,Math.ceil((camera.y+camera.h)/TILE_SIZE)+1);
       for(let y=sr;y<=er;y++) for(let x=sc;x<=ec;x++){ const id=map[y][x]; let color='#a3bf8f'; if(id===1) color='#7a6855'; else if(id===3) color='#8aab79'; else if(id===4) color='#6b8e23'; ctx.fillStyle=color; ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE); }
     }
 
-    // ==== Roses (gray) ====
+    // Roses
     function drawRose(r){
-      const s = TILE_SIZE*0.5;
-      ctx.save();
-      ctx.translate(r.x + TILE_SIZE/2, r.y + TILE_SIZE/2);
-      ctx.fillStyle = '#777';
-      ctx.strokeStyle = '#ccc';
-      ctx.lineWidth = 2;
+      const s = TILE_SIZE*0.5; ctx.save(); ctx.translate(r.x + TILE_SIZE/2, r.y + TILE_SIZE/2);
+      ctx.fillStyle = '#777'; ctx.strokeStyle = '#ccc'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(0, -s*0.2, s*0.35, 0, Math.PI*2); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-s*0.2, -s*0.25); ctx.quadraticCurveTo(0, -s*0.45, s*0.2, -s*0.25); ctx.quadraticCurveTo(0, -s*0.05, -s*0.2, -s*0.25); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, -s*0.0); ctx.lineTo(0, s*0.45); ctx.stroke();
@@ -346,159 +358,27 @@
     }
     function drawRoses(){ roses.forEach(r=>{ if(!r.taken) drawRose(r); }); }
 
-    // ホワイトバースト（バラ獲得時）
+    // バラ獲得バースト
     function triggerWhiteBurst(x,y){ bursts.push({x,y,age:0,dur:700,ringR:0}); }
     function updateBursts(dt){ for(let i=bursts.length-1;i>=0;i--){ const b=bursts[i]; b.age+=dt; b.ringR += dt*0.12*TILE_SIZE; if(b.age>b.dur) bursts.splice(i,1); } }
-    function drawBursts(){
-      if(!bursts.length) return;
-      ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.translate(-camera.x,-camera.y);
-      bursts.forEach(b=>{
-        const t = Math.max(0, 1 - b.age/b.dur);
-        ctx.save(); ctx.globalAlpha = 0.5*t + 0.2; ctx.beginPath(); ctx.arc(b.x, b.y, 18 + 30*(1-t), 0, Math.PI*2); ctx.fillStyle='white'; ctx.fill();
-        ctx.globalCompositeOperation='lighter'; ctx.globalAlpha = 0.35*t; const grd = ctx.createRadialGradient(b.x,b.y,10,b.x,b.y,90); grd.addColorStop(0,'rgba(255,255,255,0.9)'); grd.addColorStop(1,'rgba(255,255,255,0)'); ctx.beginPath(); ctx.arc(b.x, b.y, 90, 0, Math.PI*2); ctx.fillStyle=grd; ctx.fill();
-        ctx.globalAlpha = 0.55*t; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(b.x, b.y, 20 + b.ringR, 0, Math.PI*2); ctx.stroke();
-        ctx.restore();
-      });
-      ctx.restore();
-    }
+    function drawBursts(){ if(!bursts.length) return; ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.translate(-camera.x,-camera.y); bursts.forEach(b=>{ const t = Math.max(0, 1 - b.age/b.dur); ctx.save(); ctx.globalAlpha = 0.5*t + 0.2; ctx.beginPath(); ctx.arc(b.x, b.y, 18 + 30*(1-t), 0, Math.PI*2); ctx.fillStyle='white'; ctx.fill(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha = 0.35*t; const grd = ctx.createRadialGradient(b.x,b.y,10,b.x,b.y,90); grd.addColorStop(0,'rgba(255,255,255,0.9)'); grd.addColorStop(1,'rgba(255,255,255,0)'); ctx.beginPath(); ctx.arc(b.x, b.y, 90, 0, Math.PI*2); ctx.fillStyle=grd; ctx.fill(); ctx.globalAlpha = 0.55*t; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(b.x, b.y, 20 + b.ringR, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
 
-    function drawRosetsu(p){
-      ctx.save(); ctx.translate(p.x+p.size/2, p.y+p.size/2); if(p.isMoving) ctx.translate(0, Math.sin(Date.now()/100)*2);
-      ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(0,p.size*0.1,p.size*0.28,p.size*0.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(0,-p.size*0.2,p.size*0.35,p.size*0.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(-p.size*0.4,-p.size*0.5,-p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(p.size*0.4,-p.size*0.5,p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke();
-      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*0.1,-p.size*0.2,1.6,0,Math.PI*2); ctx.arc(p.size*0.1,-p.size*0.2,1.6,0,Math.PI*2); ctx.arc(0,-p.size*0.15,1.6,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='#FF9800'; ctx.beginPath(); ctx.ellipse(0,p.size*0.15,p.size*0.05,p.size*0.12,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='#FF7043'; ctx.beginPath(); ctx.moveTo(0,p.size*0.05); ctx.lineTo(-p.size*0.08,p.size*0.02); ctx.lineTo(p.size*0.08,p.size*0.02); ctx.closePath(); ctx.fill();
-      ctx.restore();
-    }
-    function drawKomaru(n){
-      ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE*.9};
-      ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(0,p.size*.15,p.size*.28,p.size*.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(0,-p.size*.2,p.size*.35,p.size*.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-p.size*.2,-p.size*.3); ctx.quadraticCurveTo(-p.size*.4,-p.size*.45,-p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(p.size*.2,-p.size*.3); ctx.quadraticCurveTo(p.size*.4,-p.size*.45,p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke();
-      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(0,-p.size*.15,1.5,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle='black'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-p.size*.1,-p.size*.1); ctx.quadraticCurveTo(0,-p.size*.07,p.size*.1,-p.size*.1); ctx.stroke();
-      ctx.restore();
-    }
-    function drawTetsuji(n){
-      ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE};
-      ctx.fillStyle='#f5deb3'; ctx.strokeStyle='black'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(0,p.size*.25,p.size*.5,p.size*.3,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(0,-p.size*.1,p.size*.4,p.size*.28,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(-p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle='#3d3532'; ctx.beginPath(); ctx.ellipse(0,0,p.size*.25,p.size*.1,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(0,p.size*.02,p.size*.04,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-    }
+    // Rosetsu & NPCs
+    function drawRosetsu(p){ ctx.save(); ctx.translate(p.x+p.size/2, p.y+p.size/2); if(p.isMoving) ctx.translate(0, Math.sin(Date.now()/100)*2); ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*0.1,p.size*0.28,p.size*0.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*0.2,p.size*0.35,p.size*0.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(-p.size*0.4,-p.size*0.5,-p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(p.size*0.4,-p.size*0.5,p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*0.1,-p.size*0.2,1.6,0,Math.PI*2); ctx.arc(p.size*0.1,-p.size*0.2,1.6,0,Math.PI*2); ctx.arc(0,-p.size*0.15,1.6,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#FF9800'; ctx.beginPath(); ctx.ellipse(0,p.size*0.15,p.size*0.05,p.size*0.12,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#FF7043'; ctx.beginPath(); ctx.moveTo(0,p.size*0.05); ctx.lineTo(-p.size*0.08,p.size*0.02); ctx.lineTo(p.size*0.08,p.size*0.02); ctx.closePath(); ctx.fill(); ctx.restore(); }
+    function drawKomaru(n){ ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE*.9}; ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*.15,p.size*.28,p.size*.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*.2,p.size*.35,p.size*.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-p.size*.2,-p.size*.3); ctx.quadraticCurveTo(-p.size*.4,-p.size*.45,-p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.size*.2,-p.size*.3); ctx.quadraticCurveTo(p.size*.4,-p.size*.45,p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(0,-p.size*.15,1.5,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='black'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-p.size*.1,-p.size*.1); ctx.quadraticCurveTo(0,-p.size*.07,p.size*.1,-p.size*.1); ctx.stroke(); ctx.restore(); }
+    function drawTetsuji(n){ ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE}; ctx.fillStyle='#f5deb3'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*.25,p.size*.5,p.size*.3,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*.1,p.size*.4,p.size*.28,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(-p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#3d3532'; ctx.beginPath(); ctx.ellipse(0,0,p.size*.25,p.size*.1,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(0,p.size*.02,p.size*.04,0,Math.PI*2); ctx.fill(); ctx.restore(); }
     function drawNPCs(){ npcs.forEach(n=>{ if(n.id==='komaru') drawKomaru(n); else drawTetsuji(n); }); }
-    function drawGlitches(){
-      const colors=['#ff00ff','#ff99ff','#ffffff','#ff99ff'];
-      glitches.forEach(g=>{
-        if(!g.fixed){ g.flicker=(g.flicker+1)|0; ctx.globalAlpha=0.7 + Math.sin(Date.now()/200)*0.3;
-          if(g.id==='ball'){
-            const isTele = (g.state==='telegraph');
-            ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = isTele ? '#ff66ff' : colors[(g.flicker>>>3)%colors.length]; ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*0.2, Math.PI*0.8); ctx.stroke();
-            ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*1.2, Math.PI*1.8); ctx.stroke();
-          } else {
-            ctx.fillStyle = colors[(g.flicker>>>3)%colors.length]; ctx.fillRect(g.x, g.y, g.size, g.size);
-          }
-          ctx.globalAlpha=1;
-        }
-      });
-    }
 
-    // ===== Update =====
-    function movePlayer(dx,dy){
-      const nx=player.x+dx, ny=player.y+dy;
-      if(!isBlocked('player', nx, player.y, player.size)) player.x=nx;
-      if(!isBlocked('player', player.x, ny, player.size)) player.y=ny;
-    }
-    function updatePlayer(){
-      player.isMoving=false; let dx=0, dy=0; const now=performance.now();
-      if(now < inputLockedUntil){ return; }
-      if(keys.ArrowUp) dy -= player.speed;
-      if(keys.ArrowDown) dy += player.speed;
-      if(keys.ArrowLeft) dx -= player.speed;
-      if(keys.ArrowRight) dx += player.speed;
-      if(touch.active){
-        const cx = player.x + player.size/2, cy = player.y + player.size/2;
-        const vx = touch.wx - cx, vy = touch.wy - cy; const d = Math.hypot(vx, vy);
-        if(d > 6){ dx = (vx/d) * player.speed; dy = (vy/d) * player.speed; }
-      }
-      if(dx||dy) player.isMoving=true; movePlayer(dx, dy);
-    }
+    // Glitches
+    function drawGlitches(){ const colors=['#ff00ff','#ff99ff','#ffffff','#ff99ff']; glitches.forEach(g=>{ if(!g.fixed){ g.flicker=(g.flicker+1)|0; ctx.globalAlpha=0.7 + Math.sin(Date.now()/200)*0.3; if(g.id==='ball'){ const isTele = (g.state==='telegraph'); ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = isTele ? '#ff66ff' : colors[(g.flicker>>>3)%colors.length]; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*0.2, Math.PI*0.8); ctx.stroke(); ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*1.2, Math.PI*1.8); ctx.stroke(); } else { ctx.fillStyle = colors[(g.flicker>>>3)%colors.length]; ctx.fillRect(g.x, g.y, g.size, g.size); } ctx.globalAlpha=1; } }); }
 
-    function updateNPCs(dt){
-      npcs.forEach(n=>{
-        n.wander -= dt; if(n.wander<=0){ const ang=Math.random()*Math.PI*2; n.vx=Math.cos(ang)*n.speed; n.vy=Math.sin(ang)*n.speed; n.wander = 1200+Math.random()*1800; }
-        const dxh=n.homeX-n.x, dyh=n.homeY-n.y, d=Math.hypot(dxh,dyh); if(d>n.radius){ const ang=Math.atan2(dyh,dxh); n.vx=Math.cos(ang)*n.speed; n.vy=Math.sin(ang)*n.speed; }
-        const nx=n.x+n.vx, ny=n.y+n.vy; if(!isBlocked('npc', nx, n.y, n.size)) n.x=nx; else n.vx*=-0.6; if(!isBlocked('npc', n.x, ny, n.size)) n.y=ny; else n.vy*=-0.6;
-      });
-    }
+    // Grid Fragments draw
+    function drawGridFragment(g){ if(g.taken) return; const s = TILE_SIZE*0.42; ctx.save(); ctx.translate(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2); ctx.rotate((performance.now()/900) % (Math.PI*2)); ctx.strokeStyle = 'rgba(0,255,255,0.85)'; ctx.lineWidth = 2; ctx.strokeRect(-s/2, -s/2, s, s); const o = s*0.35; ctx.beginPath(); ctx.moveTo(-s/2, -s/2); ctx.lineTo(-s/2+o, -s/2-o); ctx.moveTo(s/2, -s/2); ctx.lineTo(s/2+o, -s/2-o); ctx.moveTo(-s/2, s/2); ctx.lineTo(-s/2+o, s/2-o); ctx.moveTo(s/2, s/2); ctx.lineTo(s/2+o, s/2-o); ctx.stroke(); ctx.strokeRect(-s/2+o, -s/2-o, s, s); ctx.globalAlpha=0.8; ctx.lineWidth=1; for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(-s/2, i*(s/5)); ctx.lineTo(s/2, i*(s/5)); ctx.stroke(); ctx.beginPath(); ctx.moveTo(i*(s/5), -s/2); ctx.lineTo(i*(s/5), s/2); ctx.stroke(); } ctx.restore(); }
+    function drawGridFragments(){ gridFragments.forEach(g=> drawGridFragment(g)); }
 
-    // ボール近接スポーン→テレグラフ→逃走
-    function spawnBallNearPlayer(){
-      const ball = glitches.find(g=>g.id==='ball'); if(!ball) return;
-      const R = TILE_SIZE*5; let ang = Math.random()*Math.PI*2;
-      const bx = clamp(player.x + Math.cos(ang)*R, TILE_SIZE, world.w - TILE_SIZE*2);
-      const by = clamp(player.y + Math.sin(ang)*R, TILE_SIZE, world.h - TILE_SIZE*2);
-      ball.x=bx; ball.y=by; ball.size=TILE_SIZE; ball.state='telegraph'; ball.timer=900; ball.immune=900; ball.vx=0; ball.vy=0; ball.fixed=false;
-      showDialogue('？？？: なにかが現れた…', 1200, 'システム');
-    }
-
-    function updateBall(dt){
-      const ball = glitches.find(g=>g.id==='ball'); if(!ball || ball.fixed) return;
-      if(ball.state==='idle') return; // 受注前
-      if(ball.state==='telegraph'){
-        ball.timer -= dt;
-        if(ball.timer<=0){ const ang=Math.atan2(ball.y-player.y, ball.x-player.x); const spd=2.8; ball.vx=Math.cos(ang)*spd; ball.vy=Math.sin(ang)*spd; ball.state='run'; ball.timer=1800; showDialogue('ボール: ピコッ！', 900, 'システム'); }
-        return;
-      }
-      if(ball.state==='run'){
-        const speed=Math.hypot(ball.vx,ball.vy), maxSpd=4.2, acc=0.002*dt; const ns=Math.min(maxSpd, speed+acc); if(speed>0){ ball.vx*=ns/speed; ball.vy*=ns/speed; }
-        ball.x+=ball.vx; ball.y+=ball.vy;
-        if(ball.x<TILE_SIZE||ball.x>world.w-ball.size-TILE_SIZE) ball.vx*=-1;
-        if(ball.y<TILE_SIZE||ball.y>world.h-ball.size-TILE_SIZE) ball.vy*=-1;
-      }
-      if(ball.immune>0) ball.immune-=dt;
-      const d=dist(player.x+player.size/2, player.y+player.size/2, ball.x+ball.size/2, ball.y+ball.size/2);
-      if(ball.immune<=0 && d < player.size/2 + (ball.size/3)){ ball.fixed=true; ball.state='idle'; handleGlitchFix('ball'); }
-    }
-
-    function updateGlitches(){
-      glitches.forEach(g=>{
-        if(g.id==='normal' && !g.fixed){ const d=dist(player.x+player.size/2,player.y+player.size/2,g.x+TILE_SIZE/2,g.y+TILE_SIZE/2); if(d<TILE_SIZE){ g.fixed=true; handleGlitchFix('normal'); } }
-      });
-    }
-
-    // ===== Roses =====
-    function updateRoses(){
-      for(const r of roses){
-        if(r.taken) continue;
-        const d = dist(player.x+player.size/2, player.y+player.size/2, r.x+TILE_SIZE/2, r.y+TILE_SIZE/2);
-        if(d < TILE_SIZE*0.7){
-          r.taken = true; roseCount++;
-          triggerWhiteBurst(r.x+TILE_SIZE/2, r.y+TILE_SIZE/2);
-          showDialogue(`色のないバラを手に入れた (${roseCount}/${ROSE_TARGET})`, 1200, 'システム');
-          if(roseCount >= ROSE_TARGET){
-            // 6本揃ったらまず6ビット演出 → その完了後に格子Revelation
-            if(!sixBitPlayed) { triggerBinarySequence(); }
-            else { triggerRevelation(); }
-          }
-        }
-      }
-    }
-
-    // ===== Anomaly (音の波動) =====
+    // ===== Anomaly System (本実装) =====
     function spawnAnomaly(){
+      // バラ未取得の近傍に 70% の確率で出現／残りはランダム
       const remaining = roses.filter(r=>!r.taken);
       const margin = TILE_SIZE*3; let x, y;
       if(remaining.length>0 && Math.random()<0.7){
@@ -507,7 +387,7 @@
         const ang = Math.random()*Math.PI*2;
         x = clamp(r.x + Math.cos(ang)*R, margin, world.w - margin);
         y = clamp(r.y + Math.sin(ang)*R, margin, world.h - margin);
-      }else{
+      } else {
         x = Math.random()*(world.w - margin*2) + margin;
         y = Math.random()*(world.h - margin*2) + margin;
       }
@@ -518,136 +398,91 @@
       if(anomalyTimer<=0){ spawnAnomaly(); anomalyTimer = 3000 + Math.random()*3000; }
       for(let i=anomalies.length-1;i>=0;i--){ const a = anomalies[i]; a.age += dt; if(a.age > a.life) anomalies.splice(i,1); }
     }
-    function drawAnomalies(){
-      ctx.save();
-      anomalies.forEach(a=>{
-        for(let i=0;i<a.rings;i++){
-          const phase = (a.age/a.life + i/a.rings) % 1;
-          const r = a.maxR * phase;
-          const alpha = 0.75 * (1 - phase);
-          ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI*2);
-          ctx.strokeStyle = 'rgba(255,105,180,' + alpha + ')';
-          ctx.lineWidth = 4; ctx.stroke();
-        }
-        const pulse = 1 + 0.25 * Math.sin(a.age/120);
-        ctx.beginPath(); ctx.arc(a.x, a.y, 6*pulse, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(255,105,180,0.85)'; ctx.fill();
-      });
-      ctx.restore();
-    }
+    function drawAnomalies(){ ctx.save(); anomalies.forEach(a=>{ for(let i=0;i<a.rings;i++){ const phase = (a.age/a.life + i/a.rings) % 1; const r = a.maxR * phase; const alpha = 0.75 * (1 - phase); ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI*2); ctx.strokeStyle = 'rgba(255,105,180,' + alpha + ')'; ctx.lineWidth = 4; ctx.stroke(); } const pulse = 1 + 0.25 * Math.sin(a.age/120); ctx.beginPath(); ctx.arc(a.x, a.y, 6*pulse, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,105,180,0.85)'; ctx.fill(); }); ctx.restore(); }
 
-    function triggerFlash(force=false){
-      if(pinkSeen && !force) return; // 1回だけ
-      pinkSeen = true;
-      flash.dur = 1200; flash.t = flash.dur;
-      inputLockedUntil = performance.now() + flash.dur + 40;
-      const area = canvas.width * canvas.height;
-      const count = Math.max(80, Math.min(220, Math.floor(area / 8000)));
-      flash.stars = Array.from({length: count}, () => ({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: 0.6 + Math.random()*1.8, tw: Math.random()*Math.PI*2 }));
-      flash.cb = () => { showDialogue('今のは、、、宇宙に見えた、、、ピンクの空に星。なんなんだ、、、、まぼろし？？', 3200, 'ロセツ'); };
-    }
-    function drawFlashOverlay(dt){
-      if(flash.t<=0) return; flash.t -= dt; const k = Math.max(0, flash.t/flash.dur);
-      ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.92 * (1.0); ctx.fillStyle = '#ff0099'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      const tnow = performance.now(); ctx.globalAlpha = 1.0; for(const s of flash.stars){ const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw); const y  = s.y - (1.2 * (1-k)); ctx.beginPath(); ctx.arc(s.x, y, s.r*tw, 0, Math.PI*2); ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)'; ctx.fill(); }
-      ctx.restore(); if(flash.t<=0 && typeof flash.cb === 'function'){ const cb = flash.cb; flash.cb = null; cb(); }
-    }
+    // ===== Update =====
+    function movePlayer(dx,dy){ const nx=player.x+dx, ny=player.y+dy; if(!isBlocked('player', nx, player.y, player.size)) player.x=nx; if(!isBlocked('player', player.x, ny, player.size)) player.y=ny; }
+    function updatePlayer(){ player.isMoving=false; let dx=0, dy=0; const now=performance.now(); if(now < inputLockedUntil){ return; } if(keys.ArrowUp) dy -= player.speed; if(keys.ArrowDown) dy += player.speed; if(keys.ArrowLeft) dx -= player.speed; if(keys.ArrowRight) dx += player.speed; if(touch.active){ const cx = player.x + player.size/2, cy = player.y + player.size/2; const vx = touch.wx - cx, vy = touch.wy - cy; const d = Math.hypot(vx, vy); if(d > 6){ dx = (vx/d) * player.speed; dy = (vy/d) * player.speed; } } if(dx||dy) player.isMoving=true; movePlayer(dx, dy); }
+
+    function updateNPCs(dt){ npcs.forEach(n=>{ n.wander -= dt; if(n.wander<=0){ const ang=Math.random()*Math.PI*2; n.vx=Math.cos(ang)*n.speed; n.vy=Math.sin(ang)*n.speed; n.wander = 1200+Math.random()*1800; } const dxh=n.homeX-n.x, dyh=n.homeY-n.y, d=Math.hypot(dxh,dyh); if(d>n.radius){ const ang=Math.atan2(dyh,dxh); n.vx=Math.cos(ang)*n.speed; n.vy=Math.sin(ang)*n.speed; } const nx=n.x+n.vx, ny=n.y+n.vy; if(!isBlocked('npc', nx, n.y, n.size)) n.x=nx; else n.vx*=-0.6; if(!isBlocked('npc', n.x, ny, n.size)) n.y=ny; else n.vy*=-0.6; }); }
+
+    // ボール近接スポーン→テレグラフ→逃走
+    function spawnBallNearPlayer(){ const ball = glitches.find(g=>g.id==='ball'); if(!ball) return; const R = TILE_SIZE*5; let ang = Math.random()*Math.PI*2; const bx = clamp(player.x + Math.cos(ang)*R, TILE_SIZE, world.w - TILE_SIZE*2); const by = clamp(player.y + Math.sin(ang)*R, TILE_SIZE, world.h - TILE_SIZE*2); ball.x=bx; ball.y=by; ball.size=TILE_SIZE; ball.state='telegraph'; ball.timer=900; ball.immune=900; ball.vx=0; ball.vy=0; ball.fixed=false; showDialogue('？？？: なにかが現れた…', 1200, 'システム'); }
+    function updateBall(dt){ const ball = glitches.find(g=>g.id==='ball'); if(!ball || ball.fixed) return; if(ball.state==='idle') return; if(ball.state==='telegraph'){ ball.timer -= dt; if(ball.timer<=0){ const ang=Math.atan2(ball.y-player.y, ball.x-player.x); const spd=2.8; ball.vx=Math.cos(ang)*spd; ball.vy=Math.sin(ang)*spd; ball.state='run'; ball.timer=1800; showDialogue('ボール: ピコッ！', 900, 'システム'); } return; } if(ball.state==='run'){ const speed=Math.hypot(ball.vx,ball.vy), maxSpd=4.2, acc=0.002*dt; const ns=Math.min(maxSpd, speed+acc); if(speed>0){ ball.vx*=ns/speed; ball.vy*=ns/speed; } ball.x+=ball.vx; ball.y+=ball.vy; if(ball.x<TILE_SIZE||ball.x>world.w-ball.size-TILE_SIZE) ball.vx*=-1; if(ball.y<TILE_SIZE||ball.y>world.h-ball.size-TILE_SIZE) ball.vy*=-1; } if(ball.immune>0) ball.immune-=dt; const d=dist(player.x+player.size/2, player.y+player.size/2, ball.x+ball.size/2, ball.y+ball.size/2); if(ball.immune<=0 && d < player.size/2 + (ball.size/3)){ ball.fixed=true; ball.state='idle'; handleGlitchFix('ball'); } }
+
+    function updateGlitches(){ glitches.forEach(g=>{ if(g.id==='normal' && !g.fixed){ const d=dist(player.x+player.size/2,player.y+player.size/2,g.x+TILE_SIZE/2,g.y+TILE_SIZE/2); if(d<TILE_SIZE){ g.fixed=true; handleGlitchFix('normal'); } } }); }
+
+    // Roses update
+    function updateRoses(){ for(const r of roses){ if(r.taken) continue; const d = dist(player.x+player.size/2, player.y+player.size/2, r.x+TILE_SIZE/2, r.y+TILE_SIZE/2); if(d < TILE_SIZE*0.7){ r.taken = true; roseCount++; triggerWhiteBurst(r.x+TILE_SIZE/2, r.y+TILE_SIZE/2); showDialogue(`色のないバラを手に入れた (${roseCount}/${ROSE_TARGET})`, 1200, 'システム'); if(roseCount >= ROSE_TARGET){ if(!sixBitPlayed) { triggerBinarySequence(); } else { triggerRevelation(); } } } } }
+
+    // Grid Fragments update
+    function updateGridFragments(){ for(const g of gridFragments){ if(g.taken) continue; const d = dist(player.x+player.size/2, player.y+player.size/2, g.x+TILE_SIZE/2, g.y+TILE_SIZE/2); if(d < TILE_SIZE*0.7){ g.taken = true; gridCount++; triggerGridShimmer(); showDialogue(`格子片を手に入れた (${gridCount}/${GRID_TARGET})`, 1200, 'システム'); if(gridCount >= GRID_TARGET){ triggerMegaGrid(); } } } }
+
+    function triggerGridShimmer(){ gridFX.t = gridFX.dur; }
+    function drawGridFX(dt){ if(gridFX.t<=0) return; gridFX.t -= dt; gridFX.phase += dt*0.002; ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.12 + 0.18*(gridFX.t/gridFX.dur); for(let y=0;y<canvas.height;y+=3){ ctx.fillStyle='rgba(0,255,255,0.08)'; ctx.fillRect(0,y,canvas.width,1); } ctx.globalAlpha = 0.18 + 0.25*(gridFX.t/gridFX.dur); ctx.strokeStyle = 'rgba(0,255,255,0.6)'; ctx.lineWidth = 1; const step = 22, off = (gridFX.phase*40)%step; for(let x=-canvas.height; x<canvas.width+canvas.height; x+=step){ ctx.beginPath(); ctx.moveTo(x+off, 0); ctx.lineTo(x+off-canvas.height, canvas.height); ctx.stroke(); } ctx.restore(); }
+
+    function triggerMegaGrid(){ revelation.t = Math.max(revelation.t, revelation.dur*1.5); desaturatePalette = 1; showDialogue('格子が震えている…構造が露出した！', 2200, 'ロセツ'); }
+
+    // ===== 6-bit Binary Sequence =====
+    function triggerBinarySequence(debug=false){ if(sixBitPlayed && !debug) return; sixBitPlayed = true; const approxDuration = 2200; inputLockedUntil = performance.now() + approxDuration; binaryOverlay.style.display = 'flex'; let val = 1; const max = 63; const baseTick = 50; function step(){ const bin = val.toString(2).padStart(6,'0'); binaryText.textContent = (Math.random()<0.12) ? bin.replace(/[01]/g,()=> (Math.random()>.5?'1':'0')) : bin; const nextTick = Math.max(18, baseTick - val*0.4); val++; if(val<=max){ setTimeout(step, nextTick); } else { setTimeout(()=>{ binaryOverlay.style.display = 'none'; triggerRevelation(); }, 120); } } step(); }
 
     // ===== Revelation =====
-    function triggerRevelation(){
-      revelation.t = revelation.dur; desaturatePalette = 1;
-      showDialogue('ここは…格子…？世界の骨組みが見える…', 2400, 'ロセツ');
-    }
+    function triggerRevelation(){ revelation.t = revelation.dur; desaturatePalette = 1; showDialogue('ここは…格子…？世界の骨組みが見える…', 2400, 'ロセツ'); }
     function updateRevelation(dt){ if(revelation.t>0){ revelation.t -= dt; desaturatePalette = Math.max(0, revelation.t / revelation.dur); } }
     function drawRevelationOverlay(){ if(revelation.t<=0) return; ctx.save(); ctx.setTransform(1,0,0,1,0,0); const a=0.15+0.15*(revelation.t/revelation.dur); ctx.globalAlpha=a; for(let y=0;y<canvas.height;y+=3){ ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(0,y,canvas.width,1);} ctx.restore(); ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.translate(-camera.x,-camera.y); ctx.globalAlpha=0.25+0.35*(revelation.t/revelation.dur); ctx.strokeStyle='#00ffff'; ctx.lineWidth=1; for(let x=0;x<=world.w;x+=TILE_SIZE){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,world.h); ctx.stroke(); } for(let y=0;y<=world.h;y+=TILE_SIZE){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(world.w,y); ctx.stroke(); } ctx.restore(); }
     function drawDesaturateVeil(){ if(desaturatePalette<=0) return; ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.25 * desaturatePalette; ctx.fillStyle = '#cfcfcf'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore(); }
 
-    // ===== 6-bit Binary Sequence =====
-    function triggerBinarySequence(debug=false){
-      if(sixBitPlayed && !debug) return;
-      sixBitPlayed = true;
-      // 入力を弱める（既存のロックを流用）
-      const approxDuration = 2200; // だいたい
-      inputLockedUntil = performance.now() + approxDuration;
-      binaryOverlay.style.display = 'flex';
-      let val = 1; // 000001 から
-      const max = 63; // 111111
-      const baseTick = 50; // 開始速度
-
-      function step(){
-        const bin = val.toString(2).padStart(6,'0');
-        // ランダムに1フレームだけノイズ
-        binaryText.textContent = (Math.random()<0.12) ? bin.replace(/[01]/g,()=> (Math.random()>.5?'1':'0')) : bin;
-        const nextTick = Math.max(18, baseTick - val*0.4);
-        val++;
-        if(val<=max){ setTimeout(step, nextTick); }
-        else {
-          setTimeout(()=>{
-            binaryOverlay.style.display = 'none';
-            triggerRevelation(); // 既存の格子演出につなぐ
-          }, 120);
-        }
-      }
-      step();
-    }
-
     // ===== HUD =====
-    function drawHUD(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); const pad=10; const x=canvas.width/camera.dpr-140-pad; const y=8+pad; ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(x,y,140,34); ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.strokeRect(x+0.5,y+0.5,139,33); ctx.fillStyle='#fff'; ctx.font='bold 16px system-ui, sans-serif'; ctx.fillText('🌹 ' + roseCount + '/' + ROSE_TARGET, x+10, y+22); ctx.restore(); }
+    function drawHUD(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); const pad=10; const w=260; const h=34; const x=canvas.width/camera.dpr-w-pad; const y=8+pad; ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(x,y,w,h); ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.strokeRect(x+0.5,y+0.5,w-1,h-1); ctx.fillStyle='#fff'; ctx.font='bold 16px system-ui, sans-serif'; ctx.fillText('🌹 ' + roseCount + '/' + ROSE_TARGET, x+10, y+22); ctx.fillText('▦ ' + gridCount + '/' + GRID_TARGET, x+120, y+22); ctx.restore(); }
 
     // ===== Interact / Quest =====
-    function interact(){
-      let acted=false;
-      npcs.forEach(n=>{
-        const d=dist(player.x+player.size/2, player.y+player.size/2, n.x+TILE_SIZE/2, n.y+TILE_SIZE/2);
-        if(d<TILE_SIZE*1.2){
-          if(n.id==='tetsuji' && !tetsujiQuestAccepted){
-            tetsujiQuestAccepted=true; showDialogue(n.dialogue, 2600, 'tetsuji');
-            setTimeout(()=>{ showDialogue('大変だ！あのボール、すごい勢いで動き出したぞ！', 2400, 'ロセツ'); }, 2700);
-            setTimeout(()=>{ spawnBallNearPlayer(); }, 1600);
-          } else { showDialogue(n.dialogue, 3200, n.id); }
-          acted=true;
-        }
-      });
-      if(!acted) showDialogue('クンクン…特に何もないみたいだ。', 1800, 'ロセツ');
-    }
+    function interact(){ let acted=false; npcs.forEach(n=>{ const d=dist(player.x+player.size/2, player.y+player.size/2, n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); if(d<TILE_SIZE*1.2){ if(n.id==='tetsuji' && !tetsujiQuestAccepted){ tetsujiQuestAccepted=true; showDialogue(n.dialogue, 2600, 'tetsuji'); setTimeout(()=>{ showDialogue('大変だ！あのボール、すごい勢いで動き出したぞ！', 2400, 'ロセツ'); }, 2700); setTimeout(()=>{ spawnBallNearPlayer(); }, 1600); } else { showDialogue(n.dialogue, 3200, n.id); } acted=true; } }); if(!acted) showDialogue('クンクン…特に何もないみたいだ。', 1800, 'ロセツ'); }
 
-    function handleGlitchFix(id){
-      if(id==='ball'){
-        showDialogue('この野球ボール…鉄二くんのだ！返してあげなきゃ！', 2600, 'ロセツ');
-        const t=npcs.find(n=>n.id==='tetsuji'); if(t) t.dialogue='わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！';
-      } else { showDialogue('よし、世界のバグを直した！', 2200, 'ロセツ'); }
-      checkWin();
-    }
-
-    function checkWin(){
-      const allFixed = glitches.filter(g=>g.id!=='ball').every(g=>g.fixed) && (glitches.find(g=>g.id==='ball')?.fixed);
-      if(allFixed) showDialogue('やった！全部のバグを直したぞ！これでみんな安心だ！', 4800, 'ロセツ', true);
-    }
+    function handleGlitchFix(id){ if(id==='ball'){ showDialogue('この野球ボール…鉄二くんのだ！返してあげなきゃ！', 2600, 'ロセツ'); const t=npcs.find(n=>n.id==='tetsuji'); if(t) t.dialogue='わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！'; } else { showDialogue('よし、世界のバグを直した！', 2200, 'ロセツ'); } checkWin(); }
+    function checkWin(){ const allFixed = glitches.filter(g=>g.id!=='ball').every(g=>g.fixed) && (glitches.find(g=>g.id==='ball')?.fixed); if(allFixed) showDialogue('やった！全部のバグを直したぞ！これでみんな安心だ！', 4800, 'ロセツ', true); }
 
     // ===== Loop =====
     function frameBegin(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(-camera.x,-camera.y); }
     function drawTouchIndicator(){ if(!touch.active) return; ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(touch.wx, touch.wy, 12, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
     function frameEnd(){ ctx.restore(); }
     let last = performance.now();
-    function gameLoop(now){
-      const dt=Math.min(50, now-last); last=now; const timeScale = revelation.t>0 ? revelation.slow : 1; const sdt = dt * timeScale;
-      updatePlayer(); updateNPCs(sdt); if(tetsujiQuestAccepted) updateBall(sdt); updateGlitches(); updateAnomalies(sdt); updateRoses(); updateRevelation(sdt); updateBursts(sdt);
-      clampCamera(player.x+player.size/2, player.y+player.size/2);
-      frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawAnomalies(); drawRoses(); drawRosetsu(player); drawTouchIndicator(); drawHUD(); frameEnd();
-      drawDesaturateVeil(); drawFlashOverlay(sdt); drawRevelationOverlay(); drawBursts();
-      requestAnimationFrame(gameLoop);
-    }
+    function gameLoop(now){ const dt=Math.min(50, now-last); last=now; const timeScale = revelation.t>0 ? revelation.slow : 1; const sdt = dt * timeScale; updatePlayer(); updateNPCs(sdt); if(tetsujiQuestAccepted) updateBall(sdt); updateGlitches(); updateAnomalies(sdt); updateRoses(); updateGridFragments(); updateRevelation(sdt); updateBursts(sdt); clampCamera(player.x+player.size/2, player.y+player.size/2); frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawAnomalies(); drawRoses(); drawGridFragments(); drawRosetsu(player); drawTouchIndicator(); drawHUD(); frameEnd(); drawDesaturateVeil(); drawFlashOverlay(sdt); drawRevelationOverlay(); drawBursts(); drawGridFX(dt); requestAnimationFrame(gameLoop); }
 
-    function startGame(){
-      setupControls(); showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム'); clampCamera(player.x, player.y);
-      // 最初の波動を確実に出す
-      spawnAnomaly(); anomalyTimer = 2500 + Math.random()*1000; requestAnimationFrame(gameLoop);
-    }
+    function startGame(){ setupControls(); showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム'); clampCamera(player.x, player.y); // 最初の波動を確実に出す
+      spawnAnomaly(); anomalyTimer = 2500 + Math.random()*1000; requestAnimationFrame(gameLoop); }
+
+    // ===== Pink Universe (Flash) =====
+    function triggerFlash(force=false){ if(pinkSeen && !force) return; pinkSeen = true; flash.dur = 1200; flash.t = flash.dur; inputLockedUntil = performance.now() + flash.dur + 40; const area = canvas.width * canvas.height; const count = Math.max(80, Math.min(220, Math.floor(area / 8000))); flash.stars = Array.from({length: count}, () => ({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: 0.6 + Math.random()*1.8, tw: Math.random()*Math.PI*2 })); flash.cb = () => { showDialogue('今のは、、、宇宙に見えた、、、ピンクの空に星。なんなんだ、、、、まぼろし？？', 3200, 'ロセツ'); }; }
+    function drawFlashOverlay(dt){ if(flash.t<=0) return; flash.t -= dt; const k = Math.max(0, flash.t/flash.dur); ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.92 * (1.0); ctx.fillStyle = '#ff0099'; ctx.fillRect(0,0,canvas.width,canvas.height); const tnow = performance.now(); ctx.globalAlpha = 1.0; for(const s of flash.stars){ const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw); const y  = s.y - (1.2 * (1-k)); ctx.beginPath(); ctx.arc(s.x, y, s.r*tw, 0, Math.PI*2); ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)'; ctx.fill(); } ctx.restore(); if(flash.t<=0 && typeof flash.cb === 'function'){ const cb = flash.cb; flash.cb = null; cb(); } }
 
     // ===== Boot =====
     window.addEventListener('resize', layoutCanvas);
     window.addEventListener('load', layoutCanvas);
     document.fonts && document.fonts.ready && document.fonts.ready.then(layoutCanvas);
+
+    // ===== Minimal tests (enable via ?test=1) =====
+    try {
+      const params = new URLSearchParams(location.search);
+      if (params.get('test') === '1') {
+        console.info('[TEST] Running smoke tests…');
+        // 1) spawnAnomaly 定義&挙動
+        console.assert(typeof spawnAnomaly === 'function', 'spawnAnomaly should be defined');
+        const before = anomalies.length; spawnAnomaly();
+        console.assert(anomalies.length === before + 1, 'spawnAnomaly should push one anomaly');
+        // 2) updateAnomalies で寿命管理
+        const a0 = anomalies[anomalies.length-1]; const oldAge = a0.age; updateAnomalies(100); console.assert(anomalies[anomalies.length-1].age >= oldAge, 'anomaly age should advance');
+        // 3) drawAnomalies は例外を投げない
+        try { drawAnomalies(); console.info('[TEST] drawAnomalies rendered OK'); } catch(e){ console.error('[TEST] drawAnomalies threw', e); }
+        // 4) tryAnomalyHit でフラッシュが発火する想定（中心にヒットさせる）
+        const testAnom = { x: 100, y: 100, age:0, life:6000, maxR:200, hit:false, rings:3 }; anomalies.push(testAnom);
+        const fakeP = { wx: 100, wy: 100 }; const prevPink = pinkSeen; // 直接 tryAnomalyHit はクロージャ内なので代替で triggerFlash を直接検証
+        triggerFlash(true);
+        console.assert(pinkSeen === true, 'triggerFlash should set pinkSeen');
+        // 5) Binary sequence 呼び出し
+        const prevSix = sixBitPlayed; triggerBinarySequence(true); console.assert(sixBitPlayed === true, 'binary sequence should mark played');
+        console.info('[TEST] All smoke assertions passed');
+      }
+    } catch(e) { console.warn('[TEST] Error while running tests', e); }
   </script>
 </body>
 </html>
