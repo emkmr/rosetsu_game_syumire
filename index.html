@@ -295,6 +295,10 @@
     const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
     const dist=(ax,ay,bx,by)=>Math.hypot(ax-bx, ay-by);
     const rand=(a,b)=>a+Math.random()*(b-a);
+    const isOnScreen = (x,y) => (
+  x >= camera.x && x <= camera.x + camera.w &&
+  y >= camera.y && y <= camera.y + camera.h
+);
 
     function isBlocked(actor, x, y, size){
       const margin=2;
@@ -462,25 +466,27 @@
         rau.alpha = 1 - Math.pow(1-k,3);
         if(k>=1){ rau.state='visible'; rau.t = 0; }
       } else if(rau.state==='visible'){
-        const ttl = rau.visibleMin + (rau.visibleMax-rau.visibleMin)*( (Math.sin(performance.now()/533)+1)/2 );
-        const osc = 0.06 * Math.sin(performance.now()/240) + 0.04 * Math.sin(performance.now()/123);
-        rau.alpha = clamp(0.85 + osc - 0.12*rau.flicker, 0, 1);
-        if(rau.t>ttl){ rau.state='dematerializing'; rau.t=0; }
-        // たまにちらつく
-        if(Math.random()<0.008){ rau.flicker = Math.max(rau.flicker, 1); }
-        // 近接で一言
-        const d = dist(player.x+player.size/2, player.y+player.size/2, rau.x, rau.y);
-        if(!rau.spokeThisLife && d < TILE_SIZE*1.25){
-          const lines = [
-            '……ロセツ？',
-            '寒くない？',
-            'ここは……夢？',
-            'わたし、だいじょうぶ。',
-          ];
-          showDialogue(lines[Math.floor(Math.random()*lines.length)], 1600, 'rau');
-          rau.spokeThisLife = true;
-        }
-        if(d < TILE_SIZE*1.25){ rauEncounteredEver = true; }
+  const ttl = rau.visibleMin + (rau.visibleMax-rau.visibleMin)*( (Math.sin(performance.now()/533)+1)/2 );
+  const osc = 0.06 * Math.sin(performance.now()/240) + 0.04 * Math.sin(performance.now()/123);
+  rau.alpha = clamp(0.85 + osc - 0.12*rau.flicker, 0, 1);
+  if(rau.t>ttl){ rau.state='dematerializing'; rau.t=0; }
+
+  // たまにちらつく
+  if(Math.random()<0.008){ rau.flicker = Math.max(rau.flicker, 1); }
+
+  // 画面内に見えている もしくは 3タイル以内 に近づいたら「遭遇」扱い
+  const d = dist(player.x+player.size/2, player.y+player.size/2, rau.x, rau.y);
+  if (isOnScreen(rau.x, rau.y) || d < TILE_SIZE*3.0) {
+    rauEncounteredEver = true;
+  }
+
+  // ラウのひとこと（半径を少し広げる）
+  if(!rau.spokeThisLife && d < TILE_SIZE*1.8){
+    const lines = ['……ロセツ？','寒くない？','ここは……夢？','わたし、だいじょうぶ。'];
+    showDialogue(lines[Math.floor(Math.random()*lines.length)], 1600, 'rau');
+    rau.spokeThisLife = true;
+  }
+}
       } else if(rau.state==='dematerializing'){
         const k = clamp(rau.t/rau.dematerializeMs, 0, 1);
         rau.alpha = 1 - k*k*k;
