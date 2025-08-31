@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
-  <title>ロセツGAME2 — fixed + 6bit + 格子片 + アノマリー本実装</title>
+  <title>ロセツGAME2 — 開発用（Rau実装 + オープニング付き）</title>
 
   <!-- PWA / Icons -->
   <link rel="manifest" href="manifest.webmanifest" />
@@ -93,7 +93,7 @@
     </div>
   </div>
 
-  <!-- Main Game -->
+  <!-- Main Game (オープニング後に表示) -->
   <div id="mainGame" style="display:none;" class="flex flex-col items-center justify-center min-h-screen p-4">
     <div id="game-container" class="w-full max-w-2xl mx-auto">
       <h1 class="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-3">Rosetsu and the Simulated World</h1>
@@ -120,18 +120,64 @@
   </div>
 
   <script type="module">
-    // ===== DOM refs =====
+    // ===== Opening refs & control =====
     const openingSequence = document.getElementById('openingSequence');
     const initialText = document.getElementById('initialText');
     const gameTitleOpening = document.getElementById('gameTitleOpening');
     const perspectiveContainer = document.getElementById('perspectiveContainer');
-    const crawlContainer = document.getElementById('crawlContainer');
     const mainGame = document.getElementById('mainGame');
     const starsContainer = document.getElementById('starsContainer');
 
+    let openingSkipped = false;
+    const skipOpening = () => {
+      if (openingSkipped) return; openingSkipped = true;
+      openingSequence.style.display = 'none';
+      document.body.classList.add('game-body');    // 背景をゲーム用へ
+      mainGame.style.display = 'flex';             // ゲーム表示
+      layoutCanvas();                               // キャンバスサイズ調整
+      startGame();                                  // ← ゲーム開始はここだけで呼ぶ
+    };
+    // クリック/タップでスキップ
+    openingSequence.addEventListener('click', skipOpening);
+    openingSequence.addEventListener('touchstart', skipOpening, {passive:true});
+    // アニメーション遷移
+    initialText.addEventListener('animationend', () => {
+      if (openingSkipped) return;
+      initialText.style.display='none';
+      starsContainer.style.display='block';
+      gameTitleOpening.style.display='block';
+    });
+    gameTitleOpening.addEventListener('animationend', () => {
+      if (openingSkipped) return;
+      gameTitleOpening.style.display='none';
+      perspectiveContainer.style.display='block';
+    });
+    document.querySelector('#perspectiveContainer .crawl-container')
+      .addEventListener('animationend', () => { if (!openingSkipped) skipOpening(); });
+
+    // ===== DOM refs (game) =====
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const dialogueEl = document.getElementById('dialogue-container');
+
+    // --- Safety patch: guard canvas arc/ellipse radii (fixes negative/zero radius IndexSizeError) ---
+    const __ARC_MIN__ = 0.001;
+    (function patchCanvasGuards(c){
+      const arc0 = c.arc.bind(c);
+      c.arc = function(x,y,r,sa,ea,ac){
+        let rr = Number.isFinite(r) ? Math.abs(r) : __ARC_MIN__;
+        if (rr < __ARC_MIN__) rr = __ARC_MIN__;
+        return arc0(x,y,rr,sa,ea,ac);
+      };
+      const el0 = c.ellipse.bind(c);
+      c.ellipse = function(x,y,rx,ry,rot,sa,ea,ac){
+        let rxx = Number.isFinite(rx) ? Math.abs(rx) : __ARC_MIN__;
+        let ryy = Number.isFinite(ry) ? Math.abs(ry) : __ARC_MIN__;
+        if (rxx < __ARC_MIN__) rxx = __ARC_MIN__;
+        if (ryy < __ARC_MIN__) ryy = __ARC_MIN__;
+        return el0(x,y,rxx,ryy,rot,sa,ea,ac);
+      };
+    })(ctx);
 
     // === 6-bit DOM ===
     const binaryOverlay = document.getElementById('binaryOverlay');
@@ -152,23 +198,6 @@
       dialogueEl.style.top = 'calc(env(safe-area-inset-top) + 8px)';
     }
 
-    // ===== Opening control =====
-    let openingSkipped = false;
-    const skipOpening = () => {
-      if (openingSkipped) return; openingSkipped = true;
-      openingSequence.style.display = 'none';
-      document.body.classList.add('game-body');
-      mainGame.style.display = 'flex';
-      layoutCanvas();
-      startGame();
-    };
-    openingSequence.addEventListener('click', skipOpening);
-    openingSequence.addEventListener('touchstart', skipOpening, {passive:true});
-    initialText.addEventListener('animationend', () => { if (openingSkipped) return; initialText.style.display='none'; starsContainer.style.display='block'; gameTitleOpening.style.display='block'; });
-    gameTitleOpening.addEventListener('animationend', () => { if (openingSkipped) return; gameTitleOpening.style.display='none'; perspectiveContainer.style.display='block'; });
-    document.querySelector('#perspectiveContainer .crawl-container')
-      .addEventListener('animationend', () => { if (openingSkipped) return; skipOpening(); });
-
     // ===== World =====
     const TILE_SIZE = 48;
     const WORLD_COLS = 60;
@@ -188,7 +217,7 @@
 
     // ===== State =====
     const player = { x: START_TX*TILE_SIZE, y: START_TY*TILE_SIZE, size:TILE_SIZE*0.9, speed:4.2, isMoving:false };
-    const keys = {}; let gameStarted=false; let tetsujiQuestAccepted=false; let dialogueTimeout;
+    const keys = {}; let gameStarted=true; let tetsujiQuestAccepted=false; let dialogueTimeout;
 
     let anomalies = []; // {x,y,age,life,maxR,hit:false,rings:3}
     let anomalyTimer = 0; // 次のスポーンまでの残りms
@@ -265,6 +294,7 @@
     // ===== Utilities =====
     const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
     const dist=(ax,ay,bx,by)=>Math.hypot(ax-bx, ay-by);
+    const rand=(a,b)=>a+Math.random()*(b-a);
 
     function isBlocked(actor, x, y, size){
       const margin=2;
@@ -286,8 +316,8 @@
     // ===== Dialogue UI =====
     function showDialogue(text, duration=3000, speaker='ロセツ', isEnd=false){
       clearTimeout(dialogueTimeout);
-      let color='text-pink-500'; if(speaker==='komaru') color='text-green-600'; if(speaker==='tetsuji') color='text-yellow-700'; if(speaker==='システム') color='text-blue-600';
-      const speakerName = { komaru:'コマル先輩', tetsuji:'鉄二', 'ロセツ':'ロセツ', 'システム':'システム' }[speaker] || 'ロセツ';
+      let color='text-pink-500'; if(speaker==='komaru') color='text-green-600'; if(speaker==='tetsuji') color='text-yellow-700'; if(speaker==='システム') color='text-blue-600'; if(speaker==='rau') color='text-purple-600';
+      const speakerName = { komaru:'コマル先輩', tetsuji:'鉄二', 'ロセツ':'ロセツ', 'システム':'システム', 'rau':'ラウ' }[speaker] || 'ロセツ';
       const html = `
         <div class="dialogue-box bg-white bg-opacity-95 p-3 rounded-xl shadow-xl border-2 border-gray-300 max-w-md w-[92%] pointer-events-auto">
           <p class="text-gray-800 font-bold"><span class="${color}">${speakerName}:</span> ${text}</p>
@@ -300,10 +330,11 @@
     function setupControls(){
       document.getElementById('btn-action').addEventListener('click', e=>{ e.preventDefault(); if(!gameStarted) gameStarted=true; interact(); });
       window.addEventListener('keydown', e=>{ if(e.key.startsWith('Arrow')){ keys[e.key]=true; if(!gameStarted) gameStarted=true; }
-        // デバッグ: P=ピンク宇宙, B=6bit演出, G=格子片メガグリッド
+        // デバッグ: P=ピンク宇宙, B=6bit演出, G=格子片メガグリッド, O=ラウ微フリッカー
         if(e.key.toLowerCase()==='p'){ triggerFlash(true); }
         if(e.key.toLowerCase()==='b'){ if(!sixBitPlayed) triggerBinarySequence(true); }
         if(e.key.toLowerCase()==='g'){ if(gridCount>=GRID_TARGET) triggerMegaGrid(); }
+        if(e.key.toLowerCase()==='o'){ rau.flicker = Math.max(rau.flicker, 1); }
       });
       window.addEventListener('keyup',   e=>{ if(e.key.startsWith('Arrow')) keys[e.key]=false; });
 
@@ -350,7 +381,7 @@
     function drawRose(r){
       const s = TILE_SIZE*0.5; ctx.save(); ctx.translate(r.x + TILE_SIZE/2, r.y + TILE_SIZE/2);
       ctx.fillStyle = '#777'; ctx.strokeStyle = '#ccc'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(0, -s*0.2, s*0.35, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -s*0.2, Math.max(__ARC_MIN__, s*0.35), 0, Math.PI*2); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-s*0.2, -s*0.25); ctx.quadraticCurveTo(0, -s*0.45, s*0.2, -s*0.25); ctx.quadraticCurveTo(0, -s*0.05, -s*0.2, -s*0.25); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, -s*0.0); ctx.lineTo(0, s*0.45); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, s*0.2); ctx.quadraticCurveTo(s*0.25, s*0.15, s*0.18, 0); ctx.quadraticCurveTo(s*0.1, s*0.18, 0, s*0.2); ctx.fillStyle='#666'; ctx.fill(); ctx.stroke();
@@ -361,20 +392,191 @@
     // バラ獲得バースト
     function triggerWhiteBurst(x,y){ bursts.push({x,y,age:0,dur:700,ringR:0}); }
     function updateBursts(dt){ for(let i=bursts.length-1;i>=0;i--){ const b=bursts[i]; b.age+=dt; b.ringR += dt*0.12*TILE_SIZE; if(b.age>b.dur) bursts.splice(i,1); } }
-    function drawBursts(){ if(!bursts.length) return; ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.translate(-camera.x,-camera.y); bursts.forEach(b=>{ const t = Math.max(0, 1 - b.age/b.dur); ctx.save(); ctx.globalAlpha = 0.5*t + 0.2; ctx.beginPath(); ctx.arc(b.x, b.y, 18 + 30*(1-t), 0, Math.PI*2); ctx.fillStyle='white'; ctx.fill(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha = 0.35*t; const grd = ctx.createRadialGradient(b.x,b.y,10,b.x,b.y,90); grd.addColorStop(0,'rgba(255,255,255,0.9)'); grd.addColorStop(1,'rgba(255,255,255,0)'); ctx.beginPath(); ctx.arc(b.x, b.y, 90, 0, Math.PI*2); ctx.fillStyle=grd; ctx.fill(); ctx.globalAlpha = 0.55*t; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(b.x, b.y, 20 + b.ringR, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
+    function drawBursts(){ if(!bursts.length) return; ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.translate(-camera.x,-camera.y); bursts.forEach(b=>{ const t = Math.max(0, 1 - b.age/b.dur); ctx.save(); ctx.globalAlpha = 0.5*t + 0.2; ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(__ARC_MIN__, 18 + 30*(1-t)), 0, Math.PI*2); ctx.fillStyle='white'; ctx.fill(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha = 0.35*t; const grd = ctx.createRadialGradient(b.x,b.y,10,b.x,b.y,90); grd.addColorStop(0,'rgba(255,255,255,0.9)'); grd.addColorStop(1,'rgba(255,255,255,0)'); ctx.beginPath(); ctx.arc(b.x, b.y, 90, 0, Math.PI*2); ctx.fillStyle=grd; ctx.fill(); ctx.globalAlpha = 0.55*t; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(__ARC_MIN__, 20 + b.ringR), 0, Math.PI*2); ctx.stroke(); ctx.restore(); }); ctx.restore(); }
 
     // Rosetsu & NPCs
-    function drawRosetsu(p){ ctx.save(); ctx.translate(p.x+p.size/2, p.y+p.size/2); if(p.isMoving) ctx.translate(0, Math.sin(Date.now()/100)*2); ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*0.1,p.size*0.28,p.size*0.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*0.2,p.size*0.35,p.size*0.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(-p.size*0.4,-p.size*0.5,-p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(p.size*0.4,-p.size*0.5,p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*0.1,-p.size*0.2,1.6,0,Math.PI*2); ctx.arc(p.size*0.1,-p.size*0.2,1.6,0,Math.PI*2); ctx.arc(0,-p.size*0.15,1.6,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#FF9800'; ctx.beginPath(); ctx.ellipse(0,p.size*0.15,p.size*0.05,p.size*0.12,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#FF7043'; ctx.beginPath(); ctx.moveTo(0,p.size*0.05); ctx.lineTo(-p.size*0.08,p.size*0.02); ctx.lineTo(p.size*0.08,p.size*0.02); ctx.closePath(); ctx.fill(); ctx.restore(); }
-    function drawKomaru(n){ ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE*.9}; ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*.15,p.size*.28,p.size*.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*.2,p.size*.35,p.size*.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-p.size*.2,-p.size*.3); ctx.quadraticCurveTo(-p.size*.4,-p.size*.45,-p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.size*.2,-p.size*.3); ctx.quadraticCurveTo(p.size*.4,-p.size*.45,p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(p.size*.12,-p.size*.2,1.5,0,Math.PI*2); ctx.arc(0,-p.size*.15,1.5,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='black'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-p.size*.1,-p.size*.1); ctx.quadraticCurveTo(0,-p.size*.07,p.size*.1,-p.size*.1); ctx.stroke(); ctx.restore(); }
-    function drawTetsuji(n){ ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE}; ctx.fillStyle='#f5deb3'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*.25,p.size*.5,p.size*.3,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*.1,p.size*.4,p.size*.28,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(-p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#3d3532'; ctx.beginPath(); ctx.ellipse(0,0,p.size*.25,p.size*.1,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(p.size*.15,-p.size*.12,p.size*.05,0,Math.PI*2); ctx.arc(0,p.size*.02,p.size*.04,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    function drawRosetsu(p){ ctx.save(); ctx.translate(p.x+p.size/2, p.y+p.size/2); if(p.isMoving) ctx.translate(0, Math.sin(Date.now()/100)*2); ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*0.1,p.size*0.28,p.size*0.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*0.2,p.size*0.35,p.size*0.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(-p.size*0.4,-p.size*0.5,-p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.size*0.2,-p.size*0.3); ctx.quadraticCurveTo(p.size*0.4,-p.size*0.5,p.size*0.3,-p.size*0.15); ctx.fill(); ctx.stroke(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*0.1,-p.size*0.2, 1.6, 0, Math.PI*2); ctx.arc(p.size*0.1,-p.size*0.2, 1.6, 0, Math.PI*2); ctx.arc(0,-p.size*0.15, 1.6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='#FF9800'; ctx.beginPath(); ctx.ellipse(0,p.size*0.15,p.size*0.05,p.size*0.12,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#FF7043'; ctx.beginPath(); ctx.moveTo(0,p.size*0.05); ctx.lineTo(-p.size*0.08,p.size*0.02); ctx.lineTo(p.size*0.08,p.size*0.02); ctx.closePath(); ctx.fill(); ctx.restore(); }
+    function drawKomaru(n){ ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE*.9}; ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*.15,p.size*.28,p.size*.4,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*.2,p.size*.35,p.size*.25,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-p.size*.2,-p.size*.3); ctx.quadraticCurveTo(-p.size*.4,-p.size*.45,-p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(p.size*.2,-p.size*.3); ctx.quadraticCurveTo(p.size*.4,-p.size*.45,p.size*.35,-p.size*.15); ctx.fill(); ctx.stroke(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.12,-p.size*.2, 1.5, 0, Math.PI*2); ctx.arc(p.size*.12,-p.size*.2, 1.5, 0, Math.PI*2); ctx.arc(0,-p.size*.15, 1.5, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle='black'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-p.size*.1,-p.size*.1); ctx.quadraticCurveTo(0,-p.size*.07,p.size*.1,-p.size*.1); ctx.stroke(); ctx.restore(); }
+    function drawTetsuji(n){ ctx.save(); ctx.translate(n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); const p={size:TILE_SIZE}; ctx.fillStyle='#f5deb3'; ctx.strokeStyle='black'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,p.size*.25,p.size*.5,p.size*.3,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,-p.size*.1,p.size*.4,p.size*.28,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(-p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(p.size*.35,-p.size*.1,p.size*.16,p.size*.14,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#3d3532'; ctx.beginPath(); ctx.ellipse(0,0,p.size*.25,p.size*.1,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(-p.size*.15,-p.size*.12, Math.max(__ARC_MIN__, p.size*.05), 0, Math.PI*2); ctx.arc(p.size*.15,-p.size*.12, Math.max(__ARC_MIN__, p.size*.05), 0, Math.PI*2); ctx.arc(0,p.size*.02, Math.max(__ARC_MIN__, p.size*.04), 0, Math.PI*2); ctx.fill(); ctx.restore(); }
     function drawNPCs(){ npcs.forEach(n=>{ if(n.id==='komaru') drawKomaru(n); else drawTetsuji(n); }); }
 
     // Glitches
-    function drawGlitches(){ const colors=['#ff00ff','#ff99ff','#ffffff','#ff99ff']; glitches.forEach(g=>{ if(!g.fixed){ g.flicker=(g.flicker+1)|0; ctx.globalAlpha=0.7 + Math.sin(Date.now()/200)*0.3; if(g.id==='ball'){ const isTele = (g.state==='telegraph'); ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/3, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = isTele ? '#ff66ff' : colors[(g.flicker>>>3)%colors.length]; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*0.2, Math.PI*0.8); ctx.stroke(); ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, TILE_SIZE/4, Math.PI*1.2, Math.PI*1.8); ctx.stroke(); } else { ctx.fillStyle = colors[(g.flicker>>>3)%colors.length]; ctx.fillRect(g.x, g.y, g.size, g.size); } ctx.globalAlpha=1; } }); }
+    function drawGlitches(){ const colors=['#ff00ff','#ff99ff','#ffffff','#ff99ff']; glitches.forEach(g=>{ if(!g.fixed){ g.flicker=(g.flicker+1)|0; ctx.globalAlpha=0.7 + Math.sin(Date.now()/200)*0.3; if(g.id==='ball'){ const isTele = (g.state==='telegraph'); ctx.fillStyle='white'; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, Math.max(__ARC_MIN__, TILE_SIZE/3), 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = isTele ? '#ff66ff' : colors[(g.flicker>>>3)%colors.length]; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, Math.max(__ARC_MIN__, TILE_SIZE/4), Math.PI*0.2, Math.PI*0.8); ctx.stroke(); ctx.beginPath(); ctx.arc(g.x+TILE_SIZE/2, g.y+TILE_SIZE/2, Math.max(__ARC_MIN__, TILE_SIZE/4), Math.PI*1.2, Math.PI*1.8); ctx.stroke(); } else { ctx.fillStyle = colors[(g.flicker>>>3)%colors.length]; ctx.fillRect(g.x, g.y, g.size, g.size); } ctx.globalAlpha=1; } }); }
 
     // Grid Fragments draw
     function drawGridFragment(g){ if(g.taken) return; const s = TILE_SIZE*0.42; ctx.save(); ctx.translate(g.x + TILE_SIZE/2, g.y + TILE_SIZE/2); ctx.rotate((performance.now()/900) % (Math.PI*2)); ctx.strokeStyle = 'rgba(0,255,255,0.85)'; ctx.lineWidth = 2; ctx.strokeRect(-s/2, -s/2, s, s); const o = s*0.35; ctx.beginPath(); ctx.moveTo(-s/2, -s/2); ctx.lineTo(-s/2+o, -s/2-o); ctx.moveTo(s/2, -s/2); ctx.lineTo(s/2+o, -s/2-o); ctx.moveTo(-s/2, s/2); ctx.lineTo(-s/2+o, s/2-o); ctx.moveTo(s/2, s/2); ctx.lineTo(s/2+o, s/2-o); ctx.stroke(); ctx.strokeRect(-s/2+o, -s/2-o, s, s); ctx.globalAlpha=0.8; ctx.lineWidth=1; for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(-s/2, i*(s/5)); ctx.lineTo(s/2, i*(s/5)); ctx.stroke(); ctx.beginPath(); ctx.moveTo(i*(s/5), -s/2); ctx.lineTo(i*(s/5), s/2); ctx.stroke(); } ctx.restore(); }
     function drawGridFragments(){ gridFragments.forEach(g=> drawGridFragment(g)); }
+
+    // ===== RAU: Apparition (state machine) =====
+    const rau = {
+      x: player.x + TILE_SIZE*4,
+      y: player.y - TILE_SIZE*2,
+      R: 45,
+      state: 'hidden', // materializing | visible | dematerializing
+      alpha: 0,
+      t: 0,
+      materializeMs: 900,
+      dematerializeMs: 700,
+      visibleMin: 1600,
+      visibleMax: 3400,
+      nextSpawnIn: 1400,
+      flicker: 0,
+      spokeThisLife: false,
+      // look & line colors
+      lineColor: '#333',
+      fur: '#F9E7C6'
+    };
+
+    let rauEncounteredEver = false;
+    let rauRosetsuRemarkDone = false;
+
+    function spawnRauNearAnomaly(){
+      // 70%: 未ヒットのアノマリー近傍に、30%: プレイヤー近傍に
+      const active = anomalies.filter(a=>!a.hit);
+      let bx = player.x, by = player.y;
+      if(active.length>0 && Math.random()<0.7){
+        const a = active[Math.floor(Math.random()*active.length)];
+        const R = TILE_SIZE * (3 + Math.random()*4);
+        const ang = Math.random()*Math.PI*2;
+        bx = clamp(a.x + Math.cos(ang)*R, TILE_SIZE*2, world.w - TILE_SIZE*2);
+        by = clamp(a.y + Math.sin(ang)*R, TILE_SIZE*2, world.h - TILE_SIZE*2);
+      } else {
+        const R = TILE_SIZE * (3 + Math.random()*3);
+        const ang = Math.random()*Math.PI*2;
+        bx = clamp(player.x + Math.cos(ang)*R, TILE_SIZE*2, world.w - TILE_SIZE*2);
+        by = clamp(player.y + Math.sin(ang)*R, TILE_SIZE*2, world.h - TILE_SIZE*2);
+      }
+      rau.x = bx; rau.y = by; rau.t = 0; rau.spokeThisLife = false; rau.state = 'materializing';
+    }
+
+    function updateRau(dt){
+      // spawn scheduler
+      if(rau.state==='hidden'){
+        rau.nextSpawnIn -= dt;
+        if(rau.nextSpawnIn<=0){ spawnRauNearAnomaly(); rau.nextSpawnIn = 3200 + Math.random()*3200; }
+      }
+
+      rau.t += dt;
+      if(rau.state==='materializing'){
+        const k = clamp(rau.t/rau.materializeMs, 0, 1);
+        rau.alpha = 1 - Math.pow(1-k,3);
+        if(k>=1){ rau.state='visible'; rau.t = 0; }
+      } else if(rau.state==='visible'){
+        const ttl = rau.visibleMin + (rau.visibleMax-rau.visibleMin)*( (Math.sin(performance.now()/533)+1)/2 );
+        const osc = 0.06 * Math.sin(performance.now()/240) + 0.04 * Math.sin(performance.now()/123);
+        rau.alpha = clamp(0.85 + osc - 0.12*rau.flicker, 0, 1);
+        if(rau.t>ttl){ rau.state='dematerializing'; rau.t=0; }
+        // たまにちらつく
+        if(Math.random()<0.008){ rau.flicker = Math.max(rau.flicker, 1); }
+        // 近接で一言
+        const d = dist(player.x+player.size/2, player.y+player.size/2, rau.x, rau.y);
+        if(!rau.spokeThisLife && d < TILE_SIZE*1.25){
+          const lines = [
+            '……ロセツ？',
+            '寒くない？',
+            'ここは……夢？',
+            'わたし、だいじょうぶ。',
+          ];
+          showDialogue(lines[Math.floor(Math.random()*lines.length)], 1600, 'rau');
+          rau.spokeThisLife = true;
+        }
+        if(d < TILE_SIZE*1.25){ rauEncounteredEver = true; }
+      } else if(rau.state==='dematerializing'){
+        const k = clamp(rau.t/rau.dematerializeMs, 0, 1);
+        rau.alpha = 1 - k*k*k;
+        if(k>=1){
+          if(!rauRosetsuRemarkDone && rauEncounteredEver){
+            showDialogue('あの不思議な子は誰？？大きいし消えちゃった、、、、', 3000, 'ロセツ');
+            rauRosetsuRemarkDone = true;
+          }
+          rau.state='hidden'; rau.t=0; rau.alpha=0;
+        }
+      } else {
+        rau.alpha = 0;
+      }
+      // flicker decay
+      if(rau.flicker>0){ rau.flicker = Math.max(0, rau.flicker - dt/120); }
+    }
+
+    function drawRauGhost(){
+      if(rau.alpha<=0) return;
+      const a = clamp(rau.alpha, 0, 1);
+      // 微揺れ
+      const shake = rau.flicker>0 ? 2*rau.flicker : 0.6*((Math.sin(performance.now()/533)+1)/2);
+      const jx = ( (Math.sin(performance.now()*0.0031) + Math.sin(performance.now()*0.0047) )*0.5 ) * shake;
+      const jy = ( (Math.sin(performance.now()*0.0042) + Math.sin(performance.now()*0.0053) )*0.5 ) * shake;
+
+      // うしろの淡いフィールド
+      ctx.save();
+      ctx.globalAlpha = 0.15 * a;
+      for(let i=0;i<7;i++){
+        const rx = 36 + i*8, ry = 10 + i*3;
+        ctx.beginPath(); ctx.ellipse(rau.x, rau.y + 150 + i*10, rx, ry, 0, 0, Math.PI*2); ctx.fillStyle = 'rgba(160,200,255,0.25)'; ctx.fill();
+      }
+      ctx.restore();
+
+      // 本体（スペクトラル輪郭 + 本描画）
+      const ghostMix = 0.65 + 0.35*a;
+      ctx.save();
+      ctx.globalAlpha = 0.25*a; drawRauFrontCore(rau.x + 0.3 + jx, rau.y + jy, 45, rau.fur, rau.lineColor, true);
+      ctx.globalAlpha = 0.25*a; drawRauFrontCore(rau.x - 0.3 + jx, rau.y + jy, 45, rau.fur, rau.lineColor, true);
+      ctx.globalAlpha = ghostMix; drawRauFrontCore(rau.x + jx, rau.y + jy, 45, rau.fur, rau.lineColor, false);
+
+      // きらめき
+      ctx.globalAlpha = 0.25*a;
+      for(let i=0;i<8;i++){
+        const ang = Math.random()*Math.PI*2; const rr = 26 + Math.random()*36;
+        ctx.beginPath(); ctx.arc(rau.x+Math.cos(ang)*rr, rau.y+Math.sin(ang)*rr, 1.2 + Math.random()*1.1, 0, Math.PI*2); ctx.fillStyle='rgba(180,255,245,.9)'; ctx.fill();
+      }
+      // スライス・グリッチ
+      if(rau.flicker>0.1){
+        const slices = 2 + Math.floor(rau.flicker*3);
+        ctx.globalAlpha = 0.15 + 0.2*rau.flicker;
+        for(let i=0;i<slices;i++){
+          const wy = rau.y - 60 + Math.random()*120; const h = 2 + Math.random()*2; const dx = (Math.random()<0.5?-1:1) * (2 + Math.random()*6) * rau.flicker;
+          ctx.fillStyle = 'rgba(0,255,255,0.35)'; ctx.fillRect(rau.x - 60 + dx, wy, 120, h);
+        }
+      }
+      ctx.restore();
+    }
+
+    // Rau Core Drawing (Rosetsu準拠)
+    function drawRauFrontCore(x, y, R, fur, line, outlineOnly){
+      const k = 0.70; // ear base on head circle
+      const axL = x - R*k, ayL = y - R*k;
+      const axR = x + R*k, ayR = y - R*k;
+      const tipL = { x: x - R*0.95, y: y - R*1.10 };
+      const tipR = { x: x + R*0.95, y: y - R*1.10 };
+      const ixL = x - R*0.36, iyL = y - R*0.62;
+      const ixR = x + R*0.36, iyR = y - R*0.62;
+
+      if(!outlineOnly){ ctx.fillStyle = fur; }
+      ctx.strokeStyle = line; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, Math.max(__ARC_MIN__, R), 0, Math.PI*2); if(!outlineOnly) ctx.fill(); ctx.stroke();
+
+      if(!outlineOnly){ ctx.fillStyle = fur; }
+      // left ear
+      ctx.beginPath(); ctx.moveTo(axL, ayL); ctx.quadraticCurveTo(x - R*0.78, y - R*0.86, tipL.x, tipL.y); ctx.quadraticCurveTo(x - R*0.55, y - R*0.90, ixL, iyL); ctx.closePath(); if(!outlineOnly) ctx.fill(); ctx.stroke();
+      // right ear
+      ctx.beginPath(); ctx.moveTo(axR, ayR); ctx.quadraticCurveTo(x + R*0.78, y - R*0.86, tipR.x, tipR.y); ctx.quadraticCurveTo(x + R*0.55, y - R*0.90, ixR, iyR); ctx.closePath(); if(!outlineOnly) ctx.fill(); ctx.stroke();
+
+      if(!outlineOnly){
+        // eyes
+        ctx.fillStyle = '#111'; circle(x - R*0.30, y - R*0.18, 6); circle(x + R*0.30, y - R*0.18, 6);
+        ctx.fillStyle = '#fff'; circle(x - R*0.36, y - R*0.27, 2.4); circle(x + R*0.22, y - R*0.27, 2.4);
+        // nose & mouth
+        ctx.fillStyle = '#222'; circle(x, y - R*0.02, 4);
+        ctx.beginPath(); ctx.arc(x, y + 12, 12, Math.PI*0.12, Math.PI*(1-0.12)); ctx.lineWidth = 2; ctx.strokeStyle = line; ctx.stroke();
+        // body
+        const gap = 6; const bodyRx = R * 0.78, bodyRy = R * 1.15; const bodyCy = y + R + gap + bodyRy;
+        ctx.fillStyle = '#F5A7B8'; ctx.beginPath(); ctx.ellipse(x, bodyCy, bodyRx, bodyRy, 0, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = line; ctx.stroke();
+        // paws & shadow
+        ctx.fillStyle = fur; circle(x - R*0.32, bodyCy + bodyRy - 6, 8, true); circle(x + R*0.32, bodyCy + bodyRy - 6, 8, true);
+        ctx.globalAlpha = 0.14; ellipse(x, bodyCy + bodyRy + 12, bodyRx*1.0, bodyRy*0.25, '#000'); ctx.globalAlpha = 1;
+      }
+      function circle(cx, cy, r, strokeToo){ ctx.beginPath(); ctx.arc(cx, cy, Math.max(__ARC_MIN__, r), 0, Math.PI*2); ctx.fill(); if(strokeToo){ ctx.strokeStyle = line; ctx.stroke(); } }
+      function ellipse(cx, cy, rx, ry, fill){ ctx.beginPath(); ctx.ellipse(cx, cy, Math.max(__ARC_MIN__, rx), Math.max(__ARC_MIN__, ry), 0, 0, Math.PI*2); ctx.fillStyle = fill; ctx.fill(); }
+    }
 
     // ===== Anomaly System (本実装) =====
     function spawnAnomaly(){
@@ -398,7 +600,7 @@
       if(anomalyTimer<=0){ spawnAnomaly(); anomalyTimer = 3000 + Math.random()*3000; }
       for(let i=anomalies.length-1;i>=0;i--){ const a = anomalies[i]; a.age += dt; if(a.age > a.life) anomalies.splice(i,1); }
     }
-    function drawAnomalies(){ ctx.save(); anomalies.forEach(a=>{ for(let i=0;i<a.rings;i++){ const phase = (a.age/a.life + i/a.rings) % 1; const r = a.maxR * phase; const alpha = 0.75 * (1 - phase); ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI*2); ctx.strokeStyle = 'rgba(255,105,180,' + alpha + ')'; ctx.lineWidth = 4; ctx.stroke(); } const pulse = 1 + 0.25 * Math.sin(a.age/120); ctx.beginPath(); ctx.arc(a.x, a.y, 6*pulse, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,105,180,0.85)'; ctx.fill(); }); ctx.restore(); }
+    function drawAnomalies(){ ctx.save(); anomalies.forEach(a=>{ for(let i=0;i<a.rings;i++){ const phase = (a.age/a.life + i/a.rings) % 1; const r = Math.max(__ARC_MIN__, a.maxR * phase); const alpha = 0.75 * (1 - phase); ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI*2); ctx.strokeStyle = 'rgba(255,105,180,' + alpha + ')'; ctx.lineWidth = 4; ctx.stroke(); } const pulse = 1 + 0.25 * Math.sin(a.age/120); ctx.beginPath(); ctx.arc(a.x, a.y, Math.max(__ARC_MIN__, 6*pulse), 0, Math.PI*2); ctx.fillStyle = 'rgba(255,105,180,0.85)'; ctx.fill(); }); ctx.restore(); }
 
     // ===== Update =====
     function movePlayer(dx,dy){ const nx=player.x+dx, ny=player.y+dy; if(!isBlocked('player', nx, player.y, player.size)) player.x=nx; if(!isBlocked('player', player.x, ny, player.size)) player.y=ny; }
@@ -410,7 +612,7 @@
     function spawnBallNearPlayer(){ const ball = glitches.find(g=>g.id==='ball'); if(!ball) return; const R = TILE_SIZE*5; let ang = Math.random()*Math.PI*2; const bx = clamp(player.x + Math.cos(ang)*R, TILE_SIZE, world.w - TILE_SIZE*2); const by = clamp(player.y + Math.sin(ang)*R, TILE_SIZE, world.h - TILE_SIZE*2); ball.x=bx; ball.y=by; ball.size=TILE_SIZE; ball.state='telegraph'; ball.timer=900; ball.immune=900; ball.vx=0; ball.vy=0; ball.fixed=false; showDialogue('？？？: なにかが現れた…', 1200, 'システム'); }
     function updateBall(dt){ const ball = glitches.find(g=>g.id==='ball'); if(!ball || ball.fixed) return; if(ball.state==='idle') return; if(ball.state==='telegraph'){ ball.timer -= dt; if(ball.timer<=0){ const ang=Math.atan2(ball.y-player.y, ball.x-player.x); const spd=2.8; ball.vx=Math.cos(ang)*spd; ball.vy=Math.sin(ang)*spd; ball.state='run'; ball.timer=1800; showDialogue('ボール: ピコッ！', 900, 'システム'); } return; } if(ball.state==='run'){ const speed=Math.hypot(ball.vx,ball.vy), maxSpd=4.2, acc=0.002*dt; const ns=Math.min(maxSpd, speed+acc); if(speed>0){ ball.vx*=ns/speed; ball.vy*=ns/speed; } ball.x+=ball.vx; ball.y+=ball.vy; if(ball.x<TILE_SIZE||ball.x>world.w-ball.size-TILE_SIZE) ball.vx*=-1; if(ball.y<TILE_SIZE||ball.y>world.h-ball.size-TILE_SIZE) ball.vy*=-1; } if(ball.immune>0) ball.immune-=dt; const d=dist(player.x+player.size/2, player.y+player.size/2, ball.x+ball.size/2, ball.y+ball.size/2); if(ball.immune<=0 && d < player.size/2 + (ball.size/3)){ ball.fixed=true; ball.state='idle'; handleGlitchFix('ball'); } }
 
-    function updateGlitches(){ glitches.forEach(g=>{ if(g.id==='normal' && !g.fixed){ const d=dist(player.x+player.size/2,player.y+player.size/2,g.x+TILE_SIZE/2,g.y+TILE_SIZE/2); if(d<TILE_SIZE){ g.fixed=true; handleGlitchFix('normal'); } } }); }
+    function updateGlitches(){ glitches.forEach(g=>{ if(g.id==='normal' && !g.fixed){ const d=dist(player.x+player.size/2, player.y+player.size/2, g.x+TILE_SIZE/2, g.y+TILE_SIZE/2); if(d<TILE_SIZE){ g.fixed=true; handleGlitchFix('normal'); } } }); }
 
     // Roses update
     function updateRoses(){ for(const r of roses){ if(r.taken) continue; const d = dist(player.x+player.size/2, player.y+player.size/2, r.x+TILE_SIZE/2, r.y+TILE_SIZE/2); if(d < TILE_SIZE*0.7){ r.taken = true; roseCount++; triggerWhiteBurst(r.x+TILE_SIZE/2, r.y+TILE_SIZE/2); showDialogue(`色のないバラを手に入れた (${roseCount}/${ROSE_TARGET})`, 1200, 'システム'); if(roseCount >= ROSE_TARGET){ if(!sixBitPlayed) { triggerBinarySequence(); } else { triggerRevelation(); } } } } }
@@ -439,25 +641,98 @@
     function interact(){ let acted=false; npcs.forEach(n=>{ const d=dist(player.x+player.size/2, player.y+player.size/2, n.x+TILE_SIZE/2, n.y+TILE_SIZE/2); if(d<TILE_SIZE*1.2){ if(n.id==='tetsuji' && !tetsujiQuestAccepted){ tetsujiQuestAccepted=true; showDialogue(n.dialogue, 2600, 'tetsuji'); setTimeout(()=>{ showDialogue('大変だ！あのボール、すごい勢いで動き出したぞ！', 2400, 'ロセツ'); }, 2700); setTimeout(()=>{ spawnBallNearPlayer(); }, 1600); } else { showDialogue(n.dialogue, 3200, n.id); } acted=true; } }); if(!acted) showDialogue('クンクン…特に何もないみたいだ。', 1800, 'ロセツ'); }
 
     function handleGlitchFix(id){ if(id==='ball'){ showDialogue('この野球ボール…鉄二くんのだ！返してあげなきゃ！', 2600, 'ロセツ'); const t=npcs.find(n=>n.id==='tetsuji'); if(t) t.dialogue='わー！僕のボールだ！ありがとう、ロセちゃん！君はヒーローだね！'; } else { showDialogue('よし、世界のバグを直した！', 2200, 'ロセツ'); } checkWin(); }
-    function checkWin(){ const allFixed = glitches.filter(g=>g.id!=='ball').every(g=>g.fixed) && (glitches.find(g=>g.id==='ball')?.fixed); if(allFixed) showDialogue('やった！全部のバグを直したぞ！これでみんな安心だ！', 4800, 'ロセツ', true); }
+    function checkWin(){
+      const allFixed = glitches.filter(g=>g.id!=='ball').every(g=>g.fixed) && (glitches.find(g=>g.id==='ball')?.fixed);
+      if(allFixed) showDialogue('やった！全部のバグを直したぞ！これでみんな安心だ！', 4800, 'ロセツ', true);
+    }
 
     // ===== Loop =====
     function frameBegin(){ ctx.save(); ctx.setTransform(camera.dpr,0,0,camera.dpr,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(-camera.x,-camera.y); }
-    function drawTouchIndicator(){ if(!touch.active) return; ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(touch.wx, touch.wy, 12, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
+    function drawTouchIndicator(){ if(!touch.active) return; ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(touch.wx, touch.wy, Math.max(__ARC_MIN__, 12), 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
     function frameEnd(){ ctx.restore(); }
     let last = performance.now();
-    function gameLoop(now){ const dt=Math.min(50, now-last); last=now; const timeScale = revelation.t>0 ? revelation.slow : 1; const sdt = dt * timeScale; updatePlayer(); updateNPCs(sdt); if(tetsujiQuestAccepted) updateBall(sdt); updateGlitches(); updateAnomalies(sdt); updateRoses(); updateGridFragments(); updateRevelation(sdt); updateBursts(sdt); clampCamera(player.x+player.size/2, player.y+player.size/2); frameBegin(); drawMap(); drawNPCs(); drawGlitches(); drawAnomalies(); drawRoses(); drawGridFragments(); drawRosetsu(player); drawTouchIndicator(); drawHUD(); frameEnd(); drawDesaturateVeil(); drawFlashOverlay(sdt); drawRevelationOverlay(); drawBursts(); drawGridFX(dt); requestAnimationFrame(gameLoop); }
+    function gameLoop(now){
+      const dt=Math.min(50, now-last); last=now;
+      const timeScale = revelation.t>0 ? revelation.slow : 1;
+      const sdt = dt * timeScale;
+      updatePlayer();
+      updateNPCs(sdt);
+      if(tetsujiQuestAccepted) updateBall(sdt);
+      updateGlitches();
+      updateAnomalies(sdt);
+      updateRoses();
+      updateGridFragments();
+      updateRevelation(sdt);
+      updateBursts(sdt);
+      updateRau(sdt);
 
-    function startGame(){ setupControls(); showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム'); clampCamera(player.x, player.y); // 最初の波動を確実に出す
-      spawnAnomaly(); anomalyTimer = 2500 + Math.random()*1000; requestAnimationFrame(gameLoop); }
+      clampCamera(player.x+player.size/2, player.y+player.size/2);
+      frameBegin();
+      drawMap();
+      drawNPCs();
+      drawGlitches();
+      drawAnomalies();
+      drawRoses();
+      drawGridFragments();
+      drawRosetsu(player);
+      drawRauGhost();
+      drawTouchIndicator();
+      drawHUD();
+      frameEnd();
+      drawDesaturateVeil();
+      drawFlashOverlay(sdt);
+      drawRevelationOverlay();
+      drawBursts();
+      drawGridFX(dt);
+      requestAnimationFrame(gameLoop);
+    }
+
+    function startGame(){
+      setupControls();
+      showDialogue('ゲーム画面をタップしてスタート！', 2500, 'システム');
+      clampCamera(player.x, player.y);
+      // 最初のアノマリーを確実に出す
+      spawnAnomaly(); anomalyTimer = 2500 + Math.random()*1000;
+      requestAnimationFrame(gameLoop);
+    }
 
     // ===== Pink Universe (Flash) =====
-    function triggerFlash(force=false){ if(pinkSeen && !force) return; pinkSeen = true; flash.dur = 1200; flash.t = flash.dur; inputLockedUntil = performance.now() + flash.dur + 40; const area = canvas.width * canvas.height; const count = Math.max(80, Math.min(220, Math.floor(area / 8000))); flash.stars = Array.from({length: count}, () => ({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: 0.6 + Math.random()*1.8, tw: Math.random()*Math.PI*2 })); flash.cb = () => { showDialogue('今のは、、、宇宙に見えた、、、ピンクの空に星。なんなんだ、、、、まぼろし？？', 3200, 'ロセツ'); }; }
-    function drawFlashOverlay(dt){ if(flash.t<=0) return; flash.t -= dt; const k = Math.max(0, flash.t/flash.dur); ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalAlpha = 0.92 * (1.0); ctx.fillStyle = '#ff0099'; ctx.fillRect(0,0,canvas.width,canvas.height); const tnow = performance.now(); ctx.globalAlpha = 1.0; for(const s of flash.stars){ const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw); const y  = s.y - (1.2 * (1-k)); ctx.beginPath(); ctx.arc(s.x, y, s.r*tw, 0, Math.PI*2); ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)'; ctx.fill(); } ctx.restore(); if(flash.t<=0 && typeof flash.cb === 'function'){ const cb = flash.cb; flash.cb = null; cb(); } }
+    function triggerFlash(force=false){
+      if(pinkSeen && !force) return;
+      pinkSeen = true; flash.dur = 1200; flash.t = flash.dur;
+      inputLockedUntil = performance.now() + flash.dur + 40;
+      const area = canvas.width * canvas.height;
+      const count = Math.max(80, Math.min(220, Math.floor(area / 8000)));
+      flash.stars = Array.from({length: count}, () => ({
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height,
+        r: 0.6 + Math.random()*1.8,
+        tw: Math.random()*Math.PI*2
+      }));
+      flash.cb = () => { showDialogue('今のは、、、宇宙に見えた、、、ピンクの空に星。なんなんだ、、、、まぼろし？？', 3200, 'ロセツ'); };
+    }
+    function drawFlashOverlay(dt){
+      if(flash.t<=0) return;
+      flash.t -= dt; const k = Math.max(0, flash.t/flash.dur);
+      ctx.save(); ctx.setTransform(1,0,0,1,0,0);
+      ctx.globalAlpha = 0.92; ctx.fillStyle = '#ff0099';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      const tnow = performance.now(); ctx.globalAlpha = 1.0;
+      for(const s of flash.stars){
+        const tw = 0.6 + 0.4*Math.sin(tnow/200 + s.tw);
+        const y  = s.y - (1.2 * (1-k));
+        ctx.beginPath(); ctx.arc(s.x, y, Math.max(__ARC_MIN__, s.r*tw), 0, Math.PI*2);
+        ctx.fillStyle = (s.tw % 1 > 0.5) ? 'rgba(255,255,255,0.9)' : 'rgba(255,180,220,0.95)';
+        ctx.fill();
+      }
+      ctx.restore();
+      if(flash.t<=0 && typeof flash.cb === 'function'){ const cb = flash.cb; flash.cb = null; cb(); }
+    }
 
     // ===== Boot =====
     window.addEventListener('resize', layoutCanvas);
-    window.addEventListener('load', layoutCanvas);
+    // 起動時はキャンバスだけ整えてゲームは開始しない（オープニング終了で開始）
+    window.addEventListener('load', () => { layoutCanvas(); });
     document.fonts && document.fonts.ready && document.fonts.ready.then(layoutCanvas);
 
     // ===== Minimal tests (enable via ?test=1) =====
@@ -473,14 +748,43 @@
         const a0 = anomalies[anomalies.length-1]; const oldAge = a0.age; updateAnomalies(100); console.assert(anomalies[anomalies.length-1].age >= oldAge, 'anomaly age should advance');
         // 3) drawAnomalies は例外を投げない
         try { drawAnomalies(); console.info('[TEST] drawAnomalies rendered OK'); } catch(e){ console.error('[TEST] drawAnomalies threw', e); }
-        // 4) tryAnomalyHit でフラッシュが発火する想定（中心にヒットさせる）
-        const testAnom = { x: 100, y: 100, age:0, life:6000, maxR:200, hit:false, rings:3 }; anomalies.push(testAnom);
-        const fakeP = { wx: 100, wy: 100 }; const prevPink = pinkSeen; // 直接 tryAnomalyHit はクロージャ内なので代替で triggerFlash を直接検証
+        // 4) ピンク宇宙演出
         triggerFlash(true);
         console.assert(pinkSeen === true, 'triggerFlash should set pinkSeen');
-        // 5) Binary sequence 呼び出し
+        // 5) Binary sequence 一度だけ
         const prevSix = sixBitPlayed; triggerBinarySequence(true); console.assert(sixBitPlayed === true, 'binary sequence should mark played');
-        console.info('[TEST] All smoke assertions passed');
+        // 6) arc/ellipse radius guard
+        try {
+          ctx.beginPath();
+          ctx.arc(10, 10, -5, 0, Math.PI*2);
+          ctx.arc(20, 10, 0, 0, Math.PI*2);
+          ctx.stroke();
+          console.info('[TEST] arc radius guard OK');
+        } catch (e) {
+          console.error('[TEST] arc radius guard FAILED', e);
+        }
+        try {
+          ctx.beginPath();
+          ctx.ellipse(30, 10, -2, 0, 0, 0, Math.PI*2);
+          ctx.stroke();
+          console.info('[TEST] ellipse radius guard OK');
+        } catch (e) {
+          console.error('[TEST] ellipse radius guard FAILED', e);
+        }
+        // 7) Rau ロセツの台詞が一度だけ
+        try {
+          let __origShow = showDialogue, __count = 0;
+          showDialogue = function(){ __count++; return __origShow.apply(this, arguments); };
+          rauRosetsuRemarkDone = false; rauEncounteredEver = true;
+          rau.state='dematerializing'; rau.t = rau.dematerializeMs; updateRau(16);
+          const firstCount = __count;
+          // もう一度同じ条件を流しても増えない
+          rau.state='dematerializing'; rau.t = rau.dematerializeMs; updateRau(16);
+          console.assert(__count === firstCount, 'Rosetsu remark should fire exactly once');
+          showDialogue = __origShow;
+          console.info('[TEST] Rau Rosetsu remark once OK');
+        } catch(e){ console.error('[TEST] Rau Rosetsu remark test FAILED', e); }
+        console.info('[TEST] All assertions completed');
       }
     } catch(e) { console.warn('[TEST] Error while running tests', e); }
   </script>
