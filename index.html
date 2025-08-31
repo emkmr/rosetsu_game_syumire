@@ -574,7 +574,7 @@
         ctx.fillStyle = '#222'; circle(x, y - R*0.02, 4);
         ctx.beginPath(); ctx.arc(x, y + 12, 12, Math.PI*0.12, Math.PI*(1-0.12)); ctx.lineWidth = 2; ctx.strokeStyle = line; ctx.stroke();
         // body
-        const gap = 6; const bodyRx = R * 0.78, bodyRy = R * 1.15; const bodyCy = y + R + gap + bodyRy;
+        const gap = -2; const bodyRx = R * 0.78, bodyRy = R * 1.15; const bodyCy = y + R + gap + bodyRy;
         ctx.fillStyle = '#F5A7B8'; ctx.beginPath(); ctx.ellipse(x, bodyCy, bodyRx, bodyRy, 0, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = line; ctx.stroke();
         // paws & shadow
         ctx.fillStyle = fur; circle(x - R*0.32, bodyCy + bodyRy - 6, 8, true); circle(x + R*0.32, bodyCy + bodyRy - 6, 8, true);
