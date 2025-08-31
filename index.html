@@ -485,7 +485,7 @@
     const lines = ['……ロセツ？','寒くない？','ここは……夢？','わたし、だいじょうぶ。'];
     showDialogue(lines[Math.floor(Math.random()*lines.length)], 1600, 'rau');
     rau.spokeThisLife = true;
-  }
+
 }
       } else if(rau.state==='dematerializing'){
         const k = clamp(rau.t/rau.dematerializeMs, 0, 1);
