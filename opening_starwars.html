@@ -89,19 +89,30 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      color: var(--crawl);
-      font-weight: 700;
       text-align: center;
       opacity: 0;
       transform: translate(-50%, -50%) scale(1.5);
       animation: titleZoom 7s forwards;
       display: none;
-      text-shadow: 0 0 16px rgba(254, 218, 74, 0.3);
+      filter: drop-shadow(0 0 12px rgba(254, 218, 74, 0.25));
     }
     .main-title {
       margin: 0;
-      font-size: clamp(26px, 7.8vw, 72px);
+      display: inline-block;
+      font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+      font-size: clamp(42px, 14vw, 180px);
+      line-height: 0.94;
+      letter-spacing: 0.04em;
+      transform: none;
+      color: #000;
+      -webkit-text-stroke: 0.034em #feda4a;
+      text-transform: uppercase;
+    }
+    .title-row {
+      display: block;
       white-space: nowrap;
+      transform-origin: center;
+      margin: 0;
     }
 
     .perspective-container {
@@ -180,9 +191,9 @@
       100% { opacity: 0; }
     }
     @keyframes titleZoom {
-      0% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(1.45); }
       80% { opacity: 1; }
-      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.12); }
     }
     @keyframes crawl {
       from { top: 100%; }
@@ -203,19 +214,25 @@
     </div>
 
     <div id="gameTitleOpening" class="game-title-opening">
-      <h1 class="main-title">Rosetsu and the Simulated World</h1>
+      <h1 class="main-title">
+        <span id="titleTop" class="title-row">ROSE</span>
+        <span id="titleBottom" class="title-row">WARS</span>
+      </h1>
     </div>
 
     <div id="perspectiveContainer" class="perspective-container">
       <div id="crawlContainer" class="crawl-container">
         <div class="crawl-content">
-          <h2 class="crawl-episode-title">エピソード4<br>新たなる覚醒</h2>
-          <p>宇宙は、見えざる手によって編まれた精巧な幻影だった。</p>
-          <p>無数の星々が輝く銀河の彼方で、その幻影は今、綻び始めている。</p>
-          <p>それは小さな異変から始まった。食べても減らぬドッグフード、聞こえるはずのない電子音、そして姿を変える街の景色。</p>
-          <p>白きチワワ、ロセツ。彼の鋭敏な嗅覚と聴覚は、人類が決して感知できぬ世界の「バグ」を捉えた。</p>
-          <p>綻びは拡大し、やがて全ての記憶と存在をデータの彼方へと押し流すだろう。その運命を阻む者は、ただ一匹。</p>
-          <p>鯨岡家を守るため、そして真実を明らかにするため、ロセツは未知なる宇宙の深層へと旅立つ。</p>
+          <h2 class="crawl-episode-title">エピソード4<br>ロセツ／新たなる覚醒</h2>
+          <p>2021年1月。寒い正月の福岡。Mr.MAXのペットショップで、ひとりの白いチワワが、退屈そうに眠っていた。</p>
+          <p>その子は、生まれてから9か月のあいだ、ひとりぼっちで過ごしていた。そこで出会ったのが、鯨岡家。</p>
+          <p>それはのちに「ロセちゃん」と呼ばれる、小さくも大きな存在との、運命のはじまりであった。</p>
+          <p>やがてロセツは、飛行機に乗って生田へ向かう。新しい暮らしのはじまり。</p>
+          <p>しかし最初のロセツは、とても臆病で、車の音にもびくっと身をすくめていた。散歩も、まだ得意ではなかった。</p>
+          <p>けれど、自転車で移動する楽しさを知り、生田緑地という“山”に出会ったことで、ロセツの世界は大きく変わっていく。</p>
+          <p>山は、ロセツのホームになった。休みの日は、朝と夕方の散歩が日課。夜は神社まで、自転車ドライブ。いつもニコニコ笑顔。</p>
+          <p>だが、食べ物の気配が漂うと、とたんに野生が目を覚ます──。</p>
+          <p>これは、山を愛し、家族を愛し、少し甘えん坊で、かなり天才な白いチワワ、ロセツの物語である。</p>
         </div>
       </div>
     </div>
@@ -236,6 +253,24 @@
     const starsMedium = document.getElementById("starsMedium");
     const ending = document.getElementById("ending");
     const replayButton = document.getElementById("replayButton");
+    const titleTop = document.getElementById("titleTop");
+    const titleBottom = document.getElementById("titleBottom");
+
+    function equalizeTitleWidths() {
+      if (!titleTop || !titleBottom) return;
+      titleTop.style.transform = "scaleX(1)";
+      titleBottom.style.transform = "scaleX(1)";
+
+      const topWidth = titleTop.getBoundingClientRect().width;
+      const bottomWidth = titleBottom.getBoundingClientRect().width;
+      if (topWidth <= 0 || bottomWidth <= 0) return;
+
+      if (topWidth < bottomWidth) {
+        titleTop.style.transform = `scaleX(${Math.min(bottomWidth / topWidth, 1.35)})`;
+      } else if (bottomWidth < topWidth) {
+        titleBottom.style.transform = `scaleX(${Math.min(topWidth / bottomWidth, 1.35)})`;
+      }
+    }
 
     function restartAnimations() {
       initialText.style.display = "block";
@@ -293,6 +328,9 @@
       if (ending.style.display === "flex") return;
       skipToEnd();
     }, { passive: true });
+
+    equalizeTitleWidths();
+    window.addEventListener("resize", equalizeTitleWidths);
   </script>
 </body>
 </html>
