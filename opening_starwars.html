@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rosetsu Opening Crawl</title>
+  <style>
+    :root {
+      --space: #000;
+      --crawl: #feda4a;
+      --intro: #49dafd;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--space);
+      font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      color: #fff;
+    }
+
+    #openingSequence {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .hint {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      z-index: 20;
+      color: #ccc;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    .stars {
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      display: none;
+    }
+    .stars.small {
+      background-image:
+        radial-gradient(1px 1px at 20px 30px, #eee, rgba(0, 0, 0, 0)),
+        radial-gradient(1px 1px at 40px 70px, #fff, rgba(0, 0, 0, 0)),
+        radial-gradient(1px 1px at 50px 160px, #ddd, rgba(0, 0, 0, 0)),
+        radial-gradient(1px 1px at 90px 40px, #fff, rgba(0, 0, 0, 0)),
+        radial-gradient(1px 1px at 130px 80px, #fff, rgba(0, 0, 0, 0)),
+        radial-gradient(1px 1px at 160px 120px, #ddd, rgba(0, 0, 0, 0));
+      background-size: 200px 200px;
+      animation: zoom 25s infinite;
+    }
+    .stars.medium {
+      background-image:
+        radial-gradient(2px 2px at 50px 50px, #fff, rgba(0, 0, 0, 0)),
+        radial-gradient(2px 2px at 100px 100px, #ddd, rgba(0, 0, 0, 0)),
+        radial-gradient(2px 2px at 200px 150px, #fff, rgba(0, 0, 0, 0));
+      background-size: 300px 300px;
+      animation: zoom 40s infinite;
+    }
+
+    .initial-text {
+      position: absolute;
+      top: 50%;
+      left: 5%;
+      transform: translateY(-50%);
+      color: var(--intro);
+      font-size: clamp(28px, 6.8vw, 60px);
+      font-weight: 700;
+      text-align: left;
+      opacity: 0;
+      animation: introFade 5s forwards;
+      text-shadow: 0 0 8px rgba(73, 218, 253, 0.35);
+    }
+    .initial-text p {
+      margin: 0.2em 0;
+    }
+
+    .game-title-opening {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      color: var(--crawl);
+      font-weight: 700;
+      text-align: center;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1.5);
+      animation: titleZoom 7s forwards;
+      display: none;
+      text-shadow: 0 0 16px rgba(254, 218, 74, 0.3);
+    }
+    .main-title {
+      margin: 0;
+      font-size: clamp(26px, 7.8vw, 72px);
+      white-space: nowrap;
+    }
+
+    .perspective-container {
+      position: absolute;
+      inset: 0;
+      perspective: 400px;
+      perspective-origin: 50% 60%;
+      display: none;
+    }
+    .crawl-container {
+      position: absolute;
+      top: 100%;
+      width: 82%;
+      max-width: 860px;
+      left: 50%;
+      transform: translateX(-50%);
+      transform-origin: 50% 100%;
+      animation: crawl 50s linear forwards;
+    }
+    .crawl-content {
+      color: var(--crawl);
+      font-size: clamp(22px, 5.2vw, 42px);
+      line-height: 1.4;
+      text-align: justify;
+      font-weight: 700;
+      transform: rotateX(20deg);
+      text-shadow: 0 0 10px rgba(254, 218, 74, 0.2);
+    }
+    .crawl-episode-title {
+      margin-top: 0;
+      text-align: center;
+      font-size: clamp(26px, 6vw, 48px);
+      margin-bottom: 1.8em;
+      line-height: 1.25;
+    }
+    .crawl-content p {
+      margin: 0.72em 0;
+    }
+
+    .ending {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.68);
+      z-index: 25;
+    }
+    .ending p {
+      margin: 0;
+      color: #eee;
+      font-size: clamp(16px, 3.4vw, 24px);
+    }
+    .ending button {
+      border: 1px solid #f7df7b;
+      background: rgba(254, 218, 74, 0.08);
+      color: #feda4a;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .ending button:hover { background: rgba(254, 218, 74, 0.16); }
+
+    @keyframes zoom {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+    @keyframes introFade {
+      0% { opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes titleZoom {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+      80% { opacity: 1; }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+    }
+    @keyframes crawl {
+      from { top: 100%; }
+      to { top: -220%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="openingSequence" aria-label="opening">
+    <div class="hint">クリック / タップでスキップ</div>
+
+    <div id="starsSmall" class="stars small"></div>
+    <div id="starsMedium" class="stars medium"></div>
+
+    <div id="initialText" class="initial-text">
+      <p>遠い昔　　はるかかなたの</p>
+      <p>銀河系で・・・</p>
+    </div>
+
+    <div id="gameTitleOpening" class="game-title-opening">
+      <h1 class="main-title">Rosetsu and the Simulated World</h1>
+    </div>
+
+    <div id="perspectiveContainer" class="perspective-container">
+      <div id="crawlContainer" class="crawl-container">
+        <div class="crawl-content">
+          <h2 class="crawl-episode-title">エピソード4<br>新たなる覚醒</h2>
+          <p>宇宙は、見えざる手によって編まれた精巧な幻影だった。</p>
+          <p>無数の星々が輝く銀河の彼方で、その幻影は今、綻び始めている。</p>
+          <p>それは小さな異変から始まった。食べても減らぬドッグフード、聞こえるはずのない電子音、そして姿を変える街の景色。</p>
+          <p>白きチワワ、ロセツ。彼の鋭敏な嗅覚と聴覚は、人類が決して感知できぬ世界の「バグ」を捉えた。</p>
+          <p>綻びは拡大し、やがて全ての記憶と存在をデータの彼方へと押し流すだろう。その運命を阻む者は、ただ一匹。</p>
+          <p>鯨岡家を守るため、そして真実を明らかにするため、ロセツは未知なる宇宙の深層へと旅立つ。</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="ending" class="ending">
+      <p>Opening Finished</p>
+      <button id="replayButton" type="button">もう一度再生</button>
+    </div>
+  </div>
+
+  <script>
+    const openingSequence = document.getElementById("openingSequence");
+    const initialText = document.getElementById("initialText");
+    const gameTitleOpening = document.getElementById("gameTitleOpening");
+    const perspectiveContainer = document.getElementById("perspectiveContainer");
+    const crawlContainer = document.getElementById("crawlContainer");
+    const starsSmall = document.getElementById("starsSmall");
+    const starsMedium = document.getElementById("starsMedium");
+    const ending = document.getElementById("ending");
+    const replayButton = document.getElementById("replayButton");
+
+    function restartAnimations() {
+      initialText.style.display = "block";
+      initialText.style.animation = "none";
+      gameTitleOpening.style.display = "none";
+      gameTitleOpening.style.animation = "none";
+      perspectiveContainer.style.display = "none";
+      crawlContainer.style.animation = "none";
+      starsSmall.style.display = "none";
+      starsMedium.style.display = "none";
+      ending.style.display = "none";
+
+      requestAnimationFrame(() => {
+        initialText.style.animation = "introFade 5s forwards";
+      });
+    }
+
+    function skipToEnd() {
+      initialText.style.display = "none";
+      gameTitleOpening.style.display = "none";
+      perspectiveContainer.style.display = "none";
+      starsSmall.style.display = "none";
+      starsMedium.style.display = "none";
+      ending.style.display = "flex";
+    }
+
+    initialText.addEventListener("animationend", () => {
+      initialText.style.display = "none";
+      starsSmall.style.display = "block";
+      starsMedium.style.display = "block";
+      gameTitleOpening.style.display = "block";
+      gameTitleOpening.style.animation = "titleZoom 7s forwards";
+    });
+
+    gameTitleOpening.addEventListener("animationend", () => {
+      gameTitleOpening.style.display = "none";
+      perspectiveContainer.style.display = "block";
+      crawlContainer.style.animation = "crawl 50s linear forwards";
+    });
+
+    crawlContainer.addEventListener("animationend", () => {
+      ending.style.display = "flex";
+    });
+
+    replayButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      restartAnimations();
+    });
+
+    openingSequence.addEventListener("click", () => {
+      if (ending.style.display === "flex") return;
+      skipToEnd();
+    });
+    openingSequence.addEventListener("touchstart", () => {
+      if (ending.style.display === "flex") return;
+      skipToEnd();
+    }, { passive: true });
+  </script>
+</body>
+</html>
